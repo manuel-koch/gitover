@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<RCC>
+<qresource prefix="/">
+    <file>qml/Main.qml</file>
+    <file>qml/BranchCombo.qml</file>
+    <file>qml/RepoView.qml</file>
+</qresource>
+</RCC>
