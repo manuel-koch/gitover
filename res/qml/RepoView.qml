@@ -75,5 +75,24 @@ Rectangle {
                 font.pointSize:   theBranchLabel.font.pointSize
             }
         }
+        Text {
+            id: theTrackingBranchLabel
+            Layout.preferredWidth:  implicitWidth + 2
+            color:                  "black"
+            text:                   "Tracking: " + ( (ahead || behind) ? ("<b><font color='green'>"+ahead+"</font>/<font color='red'>"+behind+"</font></b> ") : "") + root.repository.trackingBranch
+            font.pointSize:         10
+            property string ahead:  root.repository.trackingBranchAhead ? ("+"+root.repository.trackingBranchAhead) : ""
+            property string behind: root.repository.trackingBranchBehind ? ("-"+root.repository.trackingBranchBehind) : ""
+        }
+        Text {
+            id: theTrunkBranchLabel
+            Layout.preferredWidth: implicitWidth + 2
+            color:                 "black"
+            text:                  "Trunk: " + ( diff ? ("<b><font color='green'>"+ahead+"</font>/<font color='red'>"+behind+"</font></b> ") : "") + root.repository.trunkBranch
+            font.pointSize:        10
+            property bool diff: root.repository.trunkBranchAhead || root.repository.trunkBranchBehind
+            property string ahead:  "+"+root.repository.trunkBranchAhead
+            property string behind: "-"+root.repository.trunkBranchBehind
+        }
     }
 }

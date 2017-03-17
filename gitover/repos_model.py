@@ -98,6 +98,12 @@ class Repo(QObject, QmlTypeMixin):
     pathChanged = pyqtSignal(str)
     nameChanged = pyqtSignal(str)
     branchChanged = pyqtSignal(str)
+    trackingBranchChanged = pyqtSignal(str)
+    trackingBranchAheadChanged = pyqtSignal(int)
+    trackingBranchBehindChanged = pyqtSignal(int)
+    trunkBranchChanged = pyqtSignal(str)
+    trunkBranchAheadChanged = pyqtSignal(int)
+    trunkBranchBehindChanged = pyqtSignal(int)
     branchesChanged = pyqtSignal("QStringList")
 
     def __init__(self, path, name="", parent=None):
@@ -105,6 +111,12 @@ class Repo(QObject, QmlTypeMixin):
         self._path = path
         self._name = name or os.path.basename(self._path)
         self._branch = ""
+        self._tracking_branch = ""
+        self._tracking_branch_ahead = 0
+        self._tracking_branch_behind = 0
+        self._trunk_branch = ""
+        self._trunk_branch_ahead = 0
+        self._trunk_branch_behind = 0
         self._branches = []
         self.sync()
 
@@ -120,15 +132,59 @@ class Repo(QObject, QmlTypeMixin):
             return
 
         try:
-            self._branch = repo.active_branch.name
+            self.branch = repo.active_branch.name
         except TypeError:
-            self._branch = "detached"
+            self.branch = "detached"
 
         try:
-            self._branches = [b.name for b in repo.branches]
-            self._branches.sort(key=str.lower)
+            branches = [b.name for b in repo.branches]
+            branches.sort(key=str.lower)
+            self.branches = branches
         except:
+            self.branches = []
             LOGGER.exception("Invalid branches for {}".format(self._path))
+
+        try:
+            if self._branch and self._branch != "detached":
+                remote = repo.git.config("branch.{}.remote".format(self._branch))
+                self.trackingBranch = "{}/{}".format(remote, self._branch)
+                ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trackingBranch),
+                                                  left_right=True, count=True).split("\t")
+                self.trackingBranchAhead, self.trackingBranchBehind = int(ahead), int(behind)
+            else:
+                self._resetTrackingBranch()
+        except:
+            self._resetTrackingBranch()
+            LOGGER.exception(
+                "Failed to get tracking branch ahead/behind counters for {}".format(self._path))
+
+        try:
+            if self._branch and self._branch != "detached":
+                try:
+                    self.trunkBranch = repo.git.config("custom.devbranch")
+                except git.GitCommandError:
+                    self.trunkBranch = "origin/develop"
+                ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trunkBranch),
+                                                  left_right=True, count=True).split("\t")
+                self.trunkBranchAhead, self.trunkBranchBehind = int(ahead), int(behind)
+            else:
+                self._resetTrunkBranch()
+        except:
+            self._resetTrunkBranch()
+            LOGGER.exception(
+                "Failed to get trunk branch ahead/behind counters for {}".format(self._path))
+
+        pass
+
+    def _resetTrackingBranch(self):
+        self.trackingBranch = ""
+        self.trackingBranchAhead = 0
+        self.trackingBranchBehind = 0
+
+    def _resetTrunkBranch(self):
+        self.trunkBranch = ""
+        self.trunkBranchAhead = 0
+        self.trunkBranchBehind = 0
 
     @pyqtProperty(str, notify=pathChanged)
     def path(self):
@@ -159,6 +215,66 @@ class Repo(QObject, QmlTypeMixin):
         if self._branch != branch:
             self._branch = branch
             self.branchChanged.emit(self._branch)
+
+    @pyqtProperty(str, notify=trackingBranchChanged)
+    def trackingBranch(self):
+        return self._tracking_branch
+
+    @trackingBranch.setter
+    def trackingBranch(self, branch):
+        if self._tracking_branch != branch:
+            self._tracking_branch = branch
+            self.trackingBranchChanged.emit(self._tracking_branch)
+
+    @pyqtProperty(int, notify=trackingBranchAheadChanged)
+    def trackingBranchAhead(self):
+        return self._tracking_branch_ahead
+
+    @trackingBranchAhead.setter
+    def trackingBranchAhead(self, ahead):
+        if self._tracking_branch_ahead != ahead:
+            self._tracking_branch_ahead = ahead
+            self.trackingBranchAheadChanged.emit(self._tracking_branch_ahead)
+
+    @pyqtProperty(int, notify=trackingBranchBehindChanged)
+    def trackingBranchBehind(self):
+        return self._tracking_branch_behind
+
+    @trackingBranchBehind.setter
+    def trackingBranchBehind(self, behind):
+        if self._tracking_branch_behind != behind:
+            self._tracking_branch_behind = behind
+            self.trackingBranchBehindChanged.emit(self._tracking_branch_behind)
+
+    @pyqtProperty(str, notify=trunkBranchChanged)
+    def trunkBranch(self):
+        return self._trunk_branch
+
+    @trunkBranch.setter
+    def trunkBranch(self, branch):
+        if self._trunk_branch != branch:
+            self._trunk_branch = branch
+            self.trunkBranchChanged.emit(self._trunk_branch)
+
+    @pyqtProperty(int, notify=trunkBranchAheadChanged)
+    def trunkBranchAhead(self):
+        return self._trunk_branch_ahead
+
+    @trunkBranchAhead.setter
+    def trunkBranchAhead(self, ahead):
+        if self._trunk_branch_ahead != ahead:
+            self._trunk_branch_ahead = ahead
+            self.trunkBranchAheadChanged.emit(self._trunk_branch_ahead)
+
+    @pyqtProperty(int, notify=trunkBranchBehindChanged)
+    def trunkBranchBehind(self):
+        return self._trunk_branch_behind
+
+    @trunkBranchBehind.setter
+    def trunkBranchBehind(self, behind):
+        if self._trunk_branch_behind != behind:
+            self._trunk_branch_behind = behind
+            self.trunkBranchBehindChanged.emit(self._trunk_branch_behind)
 
     @pyqtProperty("QStringList", notify=branchesChanged)
     def branches(self):
