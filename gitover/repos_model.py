@@ -26,7 +26,7 @@ import logging
 import git
 import os
 
-from PyQt5.QtCore import QModelIndex
+from PyQt5.QtCore import QModelIndex, pyqtSlot
 from PyQt5.QtCore import QVariant
 from PyQt5.QtCore import Qt, pyqtProperty, pyqtSignal, QObject
 from PyQt5.QtCore import QAbstractItemModel
@@ -74,6 +74,11 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
 
         return None
 
+    @pyqtSlot()
+    def sync(self):
+        for repo in self._repos:
+            repo.sync()
+
     @pyqtProperty(int, notify=nofReposChanged)
     def nofRepos(self):
         return self.rowCount()
@@ -106,6 +111,7 @@ class Repo(QObject, QmlTypeMixin):
     def __str__(self):
         return self._path
 
+    @pyqtSlot()
     def sync(self):
         try:
             repo = git.Repo(self._path)

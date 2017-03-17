@@ -35,6 +35,13 @@ Rectangle {
             text:             globalRepositories.nofRepos + " Repos..."
         }
 
+        Text {
+            Layout.fillWidth: true
+            textFormat:       Text.RichText
+            text:             "<a href='refresh'>Refresh...</a>"
+            onLinkActivated:  globalRepositories.sync()
+        }
+
         ListView {
             id: theRepoList
             Layout.fillWidth:  true
