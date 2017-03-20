@@ -23,6 +23,8 @@ import Gitover 1.0
 Item {
     id: root
 
+    height: theCombo.contentItem.implicitHeight
+
     property Repo repository: null
     property alias font: theCombo.font
 
