@@ -75,9 +75,9 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         return None
 
     @pyqtSlot()
-    def sync(self):
+    def refresh(self):
         for repo in self._repos:
-            repo.sync()
+            repo.refresh()
 
     @pyqtProperty(int, notify=nofReposChanged)
     def nofRepos(self):
@@ -105,6 +105,7 @@ class Repo(QObject, QmlTypeMixin):
     trunkBranchAheadChanged = pyqtSignal(int)
     trunkBranchBehindChanged = pyqtSignal(int)
     branchesChanged = pyqtSignal("QStringList")
+    refreshingChanged = pyqtSignal(bool)
 
     def __init__(self, path, name="", parent=None):
         super().__init__(parent)
@@ -118,13 +119,30 @@ class Repo(QObject, QmlTypeMixin):
         self._trunk_branch_ahead = 0
         self._trunk_branch_behind = 0
         self._branches = []
-        self.sync()
+        self._refreshing = False
+        self.refresh()
 
     def __str__(self):
         return self._path
 
+    @pyqtProperty(bool, notify=refreshingChanged)
+    def refreshing(self):
+        return self._refreshing
+
+    def _setRefreshing(self, refreshing):
+        if self._refreshing != refreshing:
+            self._refreshing = refreshing
+            self.refreshingChanged.emit(self._refreshing)
+
     @pyqtSlot()
-    def sync(self):
+    def refresh(self):
+        try:
+            self._setRefreshing(True)
+            self._refresh()
+        finally:
+            self._setRefreshing(False)
+
+    def _refresh(self):
         try:
             repo = git.Repo(self._path)
         except:

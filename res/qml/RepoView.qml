@@ -57,7 +57,7 @@ Rectangle {
         Text {
             id: theNameLabel
             width:          theColumn.width
-            color:          "black"
+            color:          root.repository.refreshing ? "red" : "black"
             text:           root.repository ? root.repository.name : ""
             elide:          Text.ElideRight
             font.bold:      true

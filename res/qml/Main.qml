@@ -39,7 +39,7 @@ Rectangle {
             Layout.fillWidth: true
             textFormat:       Text.RichText
             text:             "<a href='refresh'>Refresh...</a>"
-            onLinkActivated:  globalRepositories.sync()
+            onLinkActivated:  globalRepositories.refresh()
         }
 
         ListView {
