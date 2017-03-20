@@ -41,10 +41,18 @@ Rectangle {
         onClicked: root.clicked()
     }
 
+    QtObject {
+        id: internal
+        property real titleFontSize: 12
+        property real labelFontSize: 10
+        property real labelWidth:    50
+    }
+
     Column {
         id: theColumn
         anchors.fill:     parent
         anchors.margins:  root.radius
+        spacing:          2
 
         Text {
             id: theNameLabel
@@ -53,46 +61,50 @@ Rectangle {
             text:           root.repository ? root.repository.name : ""
             elide:          Text.ElideRight
             font.bold:      true
-            font.pointSize: 12
+            font.pointSize: internal.titleFontSize
         }
-        RowLayout {
+        LabelValueRow {
             id: theBranchRow
-            width:  theColumn.width
-            height: theBranchCombo.height
-
-            Text {
-                id: theBranchLabel
-                Layout.preferredWidth: implicitWidth + 2
-                color:                 "black"
-                text:                  "Branch:"
-                font.pointSize:        10
-            }
+            label:      "Branch:"
+            width:      theColumn.width
+            labelWidth: internal.labelWidth
             BranchCombo {
                 id: theBranchCombo
-                Layout.fillWidth: true
-                height:           theBranchLabel.height
                 repository:       root.repository
-                font.pointSize:   theBranchLabel.font.pointSize
+                font.pointSize:   internal.labelFontSize
             }
         }
-        Text {
-            id: theTrackingBranchLabel
-            Layout.preferredWidth:  implicitWidth + 2
-            color:                  "black"
-            text:                   "Tracking: " + ( (ahead || behind) ? ("<b><font color='green'>"+ahead+"</font>/<font color='red'>"+behind+"</font></b> ") : "") + root.repository.trackingBranch
-            font.pointSize:         10
-            property string ahead:  root.repository.trackingBranchAhead ? ("+"+root.repository.trackingBranchAhead) : ""
-            property string behind: root.repository.trackingBranchBehind ? ("-"+root.repository.trackingBranchBehind) : ""
+        LabelValueRow {
+            id: theTrackingRow
+            label:      "Tracking:"
+            width:      theColumn.width
+            labelWidth: internal.labelWidth
+            Text {
+                id: theTrackingBranchLabel
+                color:                  "black"
+                text:                   ( diff ? ("<b><font color='green'>"+ahead+"</font>/<font color='red'>"+behind+"</font></b> ") : "") +
+                                        ( root.repository ? root.repository.trackingBranch : "" )
+                font.pointSize:         internal.labelFontSize
+                property bool diff:     root.repository && (root.repository.trackingBranchAhead || root.repository.trackingBranchBehind)
+                property string ahead:  root.repository ? "+"+root.repository.trackingBranchAhead : ""
+                property string behind: root.repository ? "-"+root.repository.trackingBranchBehind : ""
+            }
         }
-        Text {
-            id: theTrunkBranchLabel
-            Layout.preferredWidth: implicitWidth + 2
-            color:                 "black"
-            text:                  "Trunk: " + ( diff ? ("<b><font color='green'>"+ahead+"</font>/<font color='red'>"+behind+"</font></b> ") : "") + root.repository.trunkBranch
-            font.pointSize:        10
-            property bool diff: root.repository.trunkBranchAhead || root.repository.trunkBranchBehind
-            property string ahead:  "+"+root.repository.trunkBranchAhead
-            property string behind: "-"+root.repository.trunkBranchBehind
+        LabelValueRow {
+            id: theTrunkRow
+            label:      "Trunk:"
+            width:      theColumn.width
+            labelWidth: internal.labelWidth
+            Text {
+                id: theTrunkBranchLabel
+                color:                  "black"
+                text:                   ( diff ? ("<b><font color='green'>"+ahead+"</font>/<font color='red'>"+behind+"</font></b> ") : "") +
+                                        ( root.repository ? root.repository.trunkBranch : "" )
+                font.pointSize:         internal.labelFontSize
+                property bool diff:     root.repository && (root.repository.trunkBranchAhead || root.repository.trunkBranchBehind)
+                property string ahead:  root.repository ? "+"+root.repository.trunkBranchAhead : ""
+                property string behind: root.repository ? "-"+root.repository.trunkBranchBehind : ""
+            }
         }
     }
 }
