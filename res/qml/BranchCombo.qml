@@ -17,69 +17,29 @@
 //
 import QtQuick 2.6
 import QtQuick.Layouts 1.2
-import QtQuick.Controls 2.1
+import QtQuick.Controls 1.4
+import QtQuick.Controls.Styles 1.4
 import Gitover 1.0
 
 Item {
     id: root
 
-    height: theCombo.contentItem.implicitHeight
+    property font font
 
     property Repo repository: null
-    property alias font: theCombo.font
+
+    Connections {
+        target: repository
+        onBranchChanged:   theCombo.useBranches(repository.branch,repository.branches)
+        onBranchesChanged: theCombo.useBranches(repository.branch,repository.branches)
+    }
 
     ComboBox {
         id: theCombo
         anchors.fill: parent
-        flat:           true
-        leftPadding:    0
-        rightPadding:   0
 
-        contentItem: Text {
-            text:                theCombo.displayText
-            font:                theCombo.font
-            color:               "black"
-            horizontalAlignment: Text.AlignLeft
-            verticalAlignment:   Text.AlignVCenter
-            elide:               Text.ElideRight
-        }
-
-        delegate: ItemDelegate {
-            width:  theCombo.width
-            height: theText.height + 2
-            Text {
-                id:         theText
-                width:      theCombo.width
-                topPadding: 1
-                text:       modelData
-                font:       root.font
-                elide:      Text.ElideRight
-            }
-            highlighted: theCombo.highlightedIndex == index
-        }
-
-        indicator: Canvas {
-            id: theCanvas
-            x:           theCombo.width - width - theCombo.rightPadding
-            y:           theCombo.topPadding + (theCombo.availableHeight - height) / 2
-            width:       12
-            height:      8
-            contextType: "2d"
-
-            Connections {
-                target: theCombo
-                onPressedChanged: theCanvas.requestPaint()
-            }
-
-            onPaint: {
-                context.reset();
-                context.moveTo(0, 0);
-                context.lineTo(width, 0);
-                context.lineTo(width / 2, height);
-                context.closePath();
-                context.strokeStyle = theCombo.pressed ? "#f8f8f8" : "black";
-                context.stroke();
-            }
+        style: ComboBoxStyle {
+            font: root.font
         }
 
         function selectBranch(branch) {
@@ -96,12 +56,6 @@ Item {
             }
             theCombo.model = b
             theCombo.currentIndex = 0
-        }
-
-        Connections {
-            target: repository
-            onBranchChanged:   useBranches(repository.branch,repository.branches)
-            onBranchesChanged: useBranches(repository.branch,repository.branches)
         }
 
         Component.onCompleted: useBranches(repository.branch,repository.branches)

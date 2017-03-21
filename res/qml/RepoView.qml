@@ -72,6 +72,7 @@ Rectangle {
                 id: theBranchCombo
                 repository:       root.repository
                 font.pointSize:   internal.labelFontSize
+                height: 14
             }
         }
         LabelValueRow {
