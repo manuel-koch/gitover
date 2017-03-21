@@ -23,6 +23,7 @@ Main window of git overview.
 """
 import logging
 import os
+import sys
 
 import git
 
@@ -73,7 +74,7 @@ def run_gui(repo_paths):
     app = QGuiApplication([])
     app.setOrganizationName("MKO")
     app.setOrganizationDomain("mko.gitover.com")
-    app.setApplicationName("git overview")
+    app.setApplicationName("GitOver")
     # app.setWindowIcon(QIcon(':/icon.png')) # FIXME
     QThread.currentThread().setObjectName('mainThread')
 
@@ -95,18 +96,15 @@ def run_gui(repo_paths):
     repos = ReposModel()
     for rootpath in repo_paths:
         repos.addRepo(Repo(rootpath))
-        subpaths = [r.abspath for r in git.Repo(rootpath).submodules]
-        subpaths.sort(key=str.lower)
-        for subpath in subpaths:
-            name = subpath[len(rootpath) + 1:]
-            repos.addRepo(Repo(subpath, name))
 
     view.engine().setOutputWarningsToStandardError(True)
     view.engine().rootContext().setContextProperty("globalRepositories", repos)
     view.setResizeMode(QQuickView.SizeRootObjectToView)
-    view.setSource(QUrl.fromLocalFile(os.path.join(base_dir, 'res/qml/Main.qml')))
-    #view.setSource(QUrl("qrc:qml/Main.qml"))
-    view.setTitle("{}".format(app.applicationName()))
+    if getattr(sys,'frozen',False):
+        view.setSource(QUrl("qrc:/qml/Main.qml"))
+    else:
+        view.setSource(QUrl.fromLocalFile(os.path.join(base_dir, 'res/qml/Main.qml')))
+    view.setTitle(app.applicationName())
     view.setWidth(w)
     view.setHeight(h)
     if x is not None:
@@ -126,6 +124,7 @@ def run_gui(repo_paths):
     settings.setValue("height", view.height())
     settings.endGroup()
 
+    repos.stopWorker()
     repos = None
     view = None
 

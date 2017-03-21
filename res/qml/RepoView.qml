@@ -54,14 +54,27 @@ Rectangle {
         anchors.margins:  root.radius
         spacing:          2
 
-        Text {
-            id: theNameLabel
-            width:          theColumn.width
-            color:          root.repository.refreshing ? "red" : "black"
-            text:           root.repository ? root.repository.name : ""
-            elide:          Text.ElideRight
-            font.bold:      true
-            font.pointSize: internal.titleFontSize
+        RowLayout {
+            width:   theColumn.width
+            height:  theNameLabel.height
+            spacing: 2
+            Text {
+                id: theNameLabel
+                Layout.fillWidth: true
+                color:            "black"
+                text:             root.repository ? root.repository.name : ""
+                elide:            Text.ElideRight
+                font.bold:        true
+                font.pointSize:   internal.titleFontSize
+            }
+            Image {
+                id: theStatusIcon
+                Layout.preferredWidth:  theNameLabel.height
+                Layout.preferredHeight: theNameLabel.height
+                fillMode:               Image.Stretch
+                source:                 "../status.png"
+                visible:                root.repository && root.repository.refreshing
+            }
         }
         LabelValueRow {
             id: theBranchRow

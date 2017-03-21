@@ -30,6 +30,7 @@ from PyQt5.QtCore import QModelIndex, pyqtSlot
 from PyQt5.QtCore import QVariant
 from PyQt5.QtCore import Qt, pyqtProperty, pyqtSignal, QObject
 from PyQt5.QtCore import QAbstractItemModel
+from PyQt5.QtCore import QThread
 
 from gitover.qml_helpers import QmlTypeMixin
 
@@ -75,13 +76,27 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         return None
 
     @pyqtSlot()
-    def refresh(self):
+    def triggerStatusUpdate(self):
         for repo in self._repos:
-            repo.refresh()
+            repo.triggerStatusUpdate()
+
+    @pyqtSlot()
+    def stopWorker(self):
+        for repo in self._repos:
+            repo.stopWorker()
 
     @pyqtProperty(int, notify=nofReposChanged)
     def nofRepos(self):
         return self.rowCount()
+
+    @pyqtSlot('QUrl')
+    def addRepoByUrl(self, url):
+        path = url.toLocalFile()
+        try:
+            is_git = bool(git.Repo(path).head)
+            self.addRepo(Repo(path))
+        except:
+            LOGGER.exception("Path is not a git repo: {}".format(path))
 
     def addRepo(self, repo):
         self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
@@ -90,6 +105,99 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         LOGGER.debug("Added repo {}".format(repo))
         self.endInsertRows()
         self.nofReposChanged.emit(self.nofRepos)
+
+        rootpath = repo.path
+        subpaths = [r.abspath for r in git.Repo(rootpath).submodules]
+        subpaths.sort(key=str.lower)
+        for subpath in subpaths:
+            name = subpath[len(rootpath) + 1:]
+            self.addRepo(Repo(subpath, name))
+
+
+class GitStatus(object):
+    def __init__(self, path):
+        self.path = path
+        self.branch = ""
+        self.branches = []
+        self.trackingBranch = ""
+        self.trackingBranchAhead = 0
+        self.trackingBranchBehind = 0
+        self.trunkBranch = ""
+        self.trunkBranch_ahead = 0
+        self.trunkBranchBehind = 0
+
+    def update(self):
+        """Update info from current git repository"""
+        try:
+            LOGGER.info("Updating status repository at {}".format(self.path))
+            repo = git.Repo(self.path)
+        except:
+            LOGGER.exception("Invalid repository at {}".format(self.path))
+            return
+
+        try:
+            self.branch = repo.active_branch.name
+        except TypeError:
+            self.branch = "detached"
+
+        try:
+            branches = [b.name for b in repo.branches]
+            branches.sort(key=str.lower)
+            self.branches = branches
+        except:
+            LOGGER.exception("Invalid branches for {}".format(self.path))
+
+        try:
+            if self.branch and self.branch != "detached":
+                remote = repo.git.config("branch.{}.remote".format(self.branch))
+                self.trackingBranch = "{}/{}".format(remote, self.branch)
+                ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trackingBranch),
+                                                  left_right=True, count=True).split("\t")
+                self.trackingBranchAhead, self.trackingBranchBehind = int(ahead), int(behind)
+        except:
+            LOGGER.exception(
+                "Failed to get tracking branch ahead/behind counters for {}".format(self.path))
+
+        try:
+            if self.branch and self.branch != "detached":
+                try:
+                    self.trunkBranch = repo.git.config("custom.devbranch")
+                except git.GitCommandError:
+                    self.trunkBranch = "origin/develop"
+                ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trunkBranch),
+                                                  left_right=True, count=True).split("\t")
+                self.trunkBranchAhead, self.trunkBranchBehind = int(ahead), int(behind)
+        except:
+            LOGGER.exception(
+                "Failed to get trunk branch ahead/behind counters for {}".format(self.path))
+
+
+class GitStatusWorker(QObject):
+    """Host git status update within workeer thread"""
+
+    # signal gets emitted to trigger updating given GitStatus
+    updatestatus = pyqtSignal(object)
+
+    # signal gets emitted when starting/stopping to update status
+    statusprogress = pyqtSignal(bool)
+
+    # signal gets emitted when given GitStatus has been updated
+    statusupdated = pyqtSignal(object)
+
+    def __init__(self):
+        super().__init__()
+        self.updatestatus.connect(self._onUpdateStatus)
+
+    @pyqtSlot(object)
+    def _onUpdateStatus(self, status):
+        """Update selected GitStatus of a git repo"""
+        self.statusprogress.emit(True)
+        try:
+            status.update()
+        except:
+            LOGGER.exception("Failed to update git status")
+        self.statusupdated.emit(status)
+        self.statusprogress.emit(False)
 
 
 class Repo(QObject, QmlTypeMixin):
@@ -109,8 +217,18 @@ class Repo(QObject, QmlTypeMixin):
 
     def __init__(self, path, name="", parent=None):
         super().__init__(parent)
+        self.destroyed.connect(self.stopWorker)
+
         self._path = path
         self._name = name or os.path.basename(self._path)
+
+        self._workerThread = QThread(self, objectName="workerThread-{}".format(name))
+        self._workerThread.start()
+
+        self._statusWorker = GitStatusWorker()
+        self._statusWorker.moveToThread(self._workerThread)
+        self._statusWorker.statusprogress.connect(self._setRefreshing)
+        self._statusWorker.statusupdated.connect(self._onStatusUpdated)
         self._branch = ""
         self._tracking_branch = ""
         self._tracking_branch_ahead = 0
@@ -119,11 +237,20 @@ class Repo(QObject, QmlTypeMixin):
         self._trunk_branch_ahead = 0
         self._trunk_branch_behind = 0
         self._branches = []
+
         self._refreshing = False
-        self.refresh()
+        self.triggerStatusUpdate()
 
     def __str__(self):
         return self._path
+
+    @pyqtSlot()
+    def stopWorker(self):
+        if self._workerThread.isRunning():
+            LOGGER.debug("Stopping worker of {}...".format(self._path))
+            self._workerThread.quit()
+            self._workerThread.wait()
+            LOGGER.debug("Stopped worker of {}".format(self._path))
 
     @pyqtProperty(bool, notify=refreshingChanged)
     def refreshing(self):
@@ -135,74 +262,22 @@ class Repo(QObject, QmlTypeMixin):
             self.refreshingChanged.emit(self._refreshing)
 
     @pyqtSlot()
-    def refresh(self):
-        try:
-            self._setRefreshing(True)
-            self._refresh()
-        finally:
-            self._setRefreshing(False)
-
-    def _refresh(self):
-        try:
-            repo = git.Repo(self._path)
-        except:
-            LOGGER.exception("Invalid repository at {}".format(self._path))
+    def triggerStatusUpdate(self):
+        if self._refreshing:
+            LOGGER.debug("Status update all ready triggered...")
             return
+        self._statusWorker.updatestatus.emit(GitStatus(self._path))
 
-        try:
-            self.branch = repo.active_branch.name
-        except TypeError:
-            self.branch = "detached"
-
-        try:
-            branches = [b.name for b in repo.branches]
-            branches.sort(key=str.lower)
-            self.branches = branches
-        except:
-            self.branches = []
-            LOGGER.exception("Invalid branches for {}".format(self._path))
-
-        try:
-            if self._branch and self._branch != "detached":
-                remote = repo.git.config("branch.{}.remote".format(self._branch))
-                self.trackingBranch = "{}/{}".format(remote, self._branch)
-                ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trackingBranch),
-                                                  left_right=True, count=True).split("\t")
-                self.trackingBranchAhead, self.trackingBranchBehind = int(ahead), int(behind)
-            else:
-                self._resetTrackingBranch()
-        except:
-            self._resetTrackingBranch()
-            LOGGER.exception(
-                "Failed to get tracking branch ahead/behind counters for {}".format(self._path))
-
-        try:
-            if self._branch and self._branch != "detached":
-                try:
-                    self.trunkBranch = repo.git.config("custom.devbranch")
-                except git.GitCommandError:
-                    self.trunkBranch = "origin/develop"
-                ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trunkBranch),
-                                                  left_right=True, count=True).split("\t")
-                self.trunkBranchAhead, self.trunkBranchBehind = int(ahead), int(behind)
-            else:
-                self._resetTrunkBranch()
-        except:
-            self._resetTrunkBranch()
-            LOGGER.exception(
-                "Failed to get trunk branch ahead/behind counters for {}".format(self._path))
-
-        pass
-
-    def _resetTrackingBranch(self):
-        self.trackingBranch = ""
-        self.trackingBranchAhead = 0
-        self.trackingBranchBehind = 0
-
-    def _resetTrunkBranch(self):
-        self.trunkBranch = ""
-        self.trunkBranchAhead = 0
-        self.trunkBranchBehind = 0
+    @pyqtSlot(object)
+    def _onStatusUpdated(self, status):
+        self.branch = status.branch
+        self.branches = status.branches
+        self.trackingBranch = status.trackingBranch
+        self.trackingBranchAhead = status.trackingBranchAhead
+        self.trackingBranchBehind = status.trackingBranchBehind
+        self.trunkBranch = status.trunkBranch
+        self.trunkBranch_ahead = status.trunkBranchAhead
+        self.trunkBranch_behind = status.trunkBranchBehind
 
     @pyqtProperty(str, notify=pathChanged)
     def path(self):

@@ -18,6 +18,7 @@
 import QtQuick 2.5
 import QtQuick.Layouts 1.2
 import QtQuick.Controls 2.1
+import QtQuick.Dialogs 1.2
 import Gitover 1.0
 
 Rectangle {
@@ -33,41 +34,68 @@ Rectangle {
         onTriggered: globalRepositories.refresh()
     }
 
+    FileDialog {
+        id: theAddRepoDialog
+        title: "Please choose a file"
+        folder: shortcuts.home
+        selectFolder: true
+        selectExisting: true
+        onAccepted: {
+            console.log("You chose: " + theAddRepoDialog.fileUrls)
+            globalRepositories.addRepoByUrl(theAddRepoDialog.fileUrls[0])
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 2
 
-        Text {
-            Layout.fillWidth: true
-            color:            "black"
-            text:             globalRepositories.nofRepos + " Repos..."
+        Row {
+            Layout.fillWidth:  true
+            height: 20
+            spacing: 8
+            Text {
+                visible: globalRepositories.nofRepos != 0
+                color:   "black"
+                text:    globalRepositories.nofRepos + " Repos..."
+            }
+            Text {
+                visible:         globalRepositories.nofRepos != 0
+                textFormat:      Text.RichText
+                text:            "<a href='refresh'>Refresh...</a>"
+                onLinkActivated: globalRepositories.triggerStatusUpdate()
+            }
+            Text {
+                textFormat:      Text.RichText
+                text:            "<a href='refresh'>Add repo...</a>"
+                onLinkActivated: theAddRepoDialog.open()
+            }
         }
 
-        Text {
-            Layout.fillWidth: true
-            textFormat:       Text.RichText
-            text:             "<a href='refresh'>Refresh...</a>"
-            onLinkActivated:  globalRepositories.refresh()
-        }
-
-        ListView {
-            id: theRepoList
+        GridView {
+            id: theRepoGrid
             Layout.fillWidth:  true
             Layout.fillHeight: true
-            spacing:           2
             clip:              true
-            snapMode:          ListView.SnapToItem
+            cellWidth:         width / cellsPerRow
+            cellHeight:        height / Math.ceil(count/cellsPerRow)
+            snapMode:          GridView.SnapToRow
             boundsBehavior:    Flickable.StopAtBounds
+
+            property int cellsPerRow: 5
 
             model: globalRepositories
 
             delegate: RepoView {
                 repository: repo
-                width:      theRepoList.width
-                onClicked:  theRepoList.currentIndex = index
+                width:      theRepoGrid.cellWidth-2
+                height:     theRepoGrid.cellHeight-2
+                onClicked:  theRepoGrid.currentIndex = index
             }
 
-            ScrollIndicator.vertical: ScrollIndicator { }
+            // Doesn't work in frozen/bundled application
+            //ScrollIndicator.vertical:   ScrollIndicator { }
+            //ScrollIndicator.horizontal: ScrollIndicator { }
 
             onCurrentIndexChanged: console.debug("currentIndex",currentIndex)
         }
