@@ -4,6 +4,7 @@
     <file>qml/BranchCombo.qml</file>
     <file>qml/LabelValueRow.qml</file>
     <file>qml/RepoView.qml</file>
+    <file>fetch.png</file>
     <file>status.png</file>
 </qresource>
 </RCC>

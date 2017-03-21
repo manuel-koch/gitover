@@ -63,7 +63,13 @@ Rectangle {
                 visible:         globalRepositories.nofRepos != 0
                 textFormat:      Text.RichText
                 text:            "<a href='refresh'>Refresh...</a>"
-                onLinkActivated: globalRepositories.triggerStatusUpdate()
+                onLinkActivated: globalRepositories.triggerUpdate()
+            }
+            Text {
+                visible:         globalRepositories.nofRepos != 0
+                textFormat:      Text.RichText
+                text:            "<a href='fetch'>Fetch...</a>"
+                onLinkActivated: globalRepositories.triggerFetch()
             }
             Text {
                 textFormat:      Text.RichText

@@ -22,10 +22,12 @@ Copyright 2017 Manuel Koch
 Data model for all repositiories.
 """
 import logging
+import os
+import random
+import threading
+import time
 
 import git
-import os
-
 from PyQt5.QtCore import QModelIndex, pyqtSlot
 from PyQt5.QtCore import QVariant
 from PyQt5.QtCore import Qt, pyqtProperty, pyqtSignal, QObject
@@ -76,9 +78,14 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         return None
 
     @pyqtSlot()
-    def triggerStatusUpdate(self):
+    def triggerUpdate(self):
         for repo in self._repos:
-            repo.triggerStatusUpdate()
+            repo.triggerUpdate()
+
+    @pyqtSlot()
+    def triggerFetch(self):
+        for repo in self._repos:
+            repo.triggerFetch()
 
     @pyqtSlot()
     def stopWorker(self):
@@ -173,7 +180,7 @@ class GitStatus(object):
 
 
 class GitStatusWorker(QObject):
-    """Host git status update within workeer thread"""
+    """Host git status update within worker thread"""
 
     # signal gets emitted to trigger updating given GitStatus
     updatestatus = pyqtSignal(object)
@@ -195,9 +202,57 @@ class GitStatusWorker(QObject):
         try:
             status.update()
         except:
-            LOGGER.exception("Failed to update git status")
+            LOGGER.exception("Failed to update git status at {}".format(status.path))
         self.statusupdated.emit(status)
         self.statusprogress.emit(False)
+
+
+class GitFetchWorker(QObject):
+    """Host git fetch action within worker thread"""
+
+    concurrent_fetch_count = 0
+    concurrent_fetch_lock = threading.Lock()
+    max_concurrent_fetch_count = 5
+
+    # signal gets emitted to trigger updating given repo root path
+    fetch = pyqtSignal(str)
+
+    # signal gets emitted when starting/stopping fetch action
+    fetchprogress = pyqtSignal(bool)
+
+    def __init__(self):
+        super().__init__()
+        self.fetch.connect(self._onFetch)
+
+    def _aquireFetchSlot(self):
+        """Try to aquire fetch slot, returns true on success.
+        Caller should retry with delay to aquire again."""
+        with GitFetchWorker.concurrent_fetch_lock:
+            if GitFetchWorker.concurrent_fetch_count > GitFetchWorker.max_concurrent_fetch_count:
+                return False
+            GitFetchWorker.concurrent_fetch_count += 1
+        return True
+
+    def _releaseFetchSlot(self):
+        """Release fetch slot"""
+        with GitFetchWorker.concurrent_fetch_lock:
+            if GitFetchWorker.concurrent_fetch_count > 0:
+                GitFetchWorker.concurrent_fetch_count -= 1
+
+    @pyqtSlot(str)
+    def _onFetch(self, path):
+        """Fetch selected repo"""
+        self.fetchprogress.emit(True)
+        try:
+            while not self._aquireFetchSlot():
+                # prevent multiple fetch starting instantly
+                time.sleep(1 + 1.0 / random.randint(1, 10))
+            repo = git.Repo(path)
+            repo.git.fetch(prune=True)
+        except:
+            LOGGER.exception("Failed to fetch git repo at {}".format(path))
+        self._releaseFetchSlot()
+        self.fetchprogress.emit(False)
 
 
 class Repo(QObject, QmlTypeMixin):
@@ -213,7 +268,8 @@ class Repo(QObject, QmlTypeMixin):
     trunkBranchAheadChanged = pyqtSignal(int)
     trunkBranchBehindChanged = pyqtSignal(int)
     branchesChanged = pyqtSignal("QStringList")
-    refreshingChanged = pyqtSignal(bool)
+    updatingChanged = pyqtSignal(bool)
+    fetchingChanged = pyqtSignal(bool)
 
     def __init__(self, path, name="", parent=None):
         super().__init__(parent)
@@ -227,8 +283,13 @@ class Repo(QObject, QmlTypeMixin):
 
         self._statusWorker = GitStatusWorker()
         self._statusWorker.moveToThread(self._workerThread)
-        self._statusWorker.statusprogress.connect(self._setRefreshing)
+        self._statusWorker.statusprogress.connect(self._onUpdating)
         self._statusWorker.statusupdated.connect(self._onStatusUpdated)
+
+        self._fetchWorker = GitFetchWorker()
+        self._fetchWorker.moveToThread(self._workerThread)
+        self._fetchWorker.fetchprogress.connect(self._setFetching)
+
         self._branch = ""
         self._tracking_branch = ""
         self._tracking_branch_ahead = 0
@@ -238,8 +299,13 @@ class Repo(QObject, QmlTypeMixin):
         self._trunk_branch_behind = 0
         self._branches = []
 
-        self._refreshing = False
-        self.triggerStatusUpdate()
+        self._updating = False
+        self._updateTriggered = False
+
+        self._fetching = False
+        self._fetchTriggered = False
+
+        self.triggerUpdate()
 
     def __str__(self):
         return self._path
@@ -252,21 +318,44 @@ class Repo(QObject, QmlTypeMixin):
             self._workerThread.wait()
             LOGGER.debug("Stopped worker of {}".format(self._path))
 
-    @pyqtProperty(bool, notify=refreshingChanged)
-    def refreshing(self):
-        return self._refreshing
+    @pyqtProperty(bool, notify=updatingChanged)
+    def updating(self):
+        return self._updating
 
-    def _setRefreshing(self, refreshing):
-        if self._refreshing != refreshing:
-            self._refreshing = refreshing
-            self.refreshingChanged.emit(self._refreshing)
+    def _onUpdating(self, updating):
+        if self._updating != updating:
+            self._updating = updating
+            self.updatingChanged.emit(self._updating)
+        if not updating:
+            self._updateTriggered = False
 
     @pyqtSlot()
-    def triggerStatusUpdate(self):
-        if self._refreshing:
-            LOGGER.debug("Status update all ready triggered...")
+    def triggerUpdate(self):
+        if self._updateTriggered:
+            LOGGER.debug("Status update already triggered...")
             return
         self._statusWorker.updatestatus.emit(GitStatus(self._path))
+        self._updateTriggered = True
+
+    @pyqtProperty(bool, notify=fetchingChanged)
+    def fetching(self):
+        return self._fetching
+
+    def _setFetching(self, fetching):
+        if self._fetching != fetching:
+            self._fetching = fetching
+            self.fetchingChanged.emit(self._fetching)
+        if not fetching:
+            self._fetchTriggered = False
+            self.triggerUpdate()
+
+    @pyqtSlot()
+    def triggerFetch(self):
+        if self._fetchTriggered:
+            LOGGER.debug("Fetch already triggered...")
+            return
+        self._fetchWorker.fetch.emit(self._path)
+        self._fetchTriggered = True
 
     @pyqtSlot(object)
     def _onStatusUpdated(self, status):

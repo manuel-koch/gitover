@@ -60,12 +60,14 @@ Rectangle {
             spacing: 2
             Text {
                 id: theNameLabel
-                Layout.fillWidth: true
-                color:            "black"
-                text:             root.repository ? root.repository.name : ""
-                elide:            Text.ElideRight
-                font.bold:        true
-                font.pointSize:   internal.titleFontSize
+                Layout.fillWidth:       true
+                Layout.preferredHeight: 16
+                color:                  "black"
+                text:                   root.repository ? root.repository.name : ""
+                elide:                  Text.ElideRight
+                verticalAlignment:      Text.AlignVCenter
+                font.bold:              true
+                font.pointSize:         internal.titleFontSize
             }
             Image {
                 id: theStatusIcon
@@ -73,7 +75,15 @@ Rectangle {
                 Layout.preferredHeight: theNameLabel.height
                 fillMode:               Image.Stretch
                 source:                 "../status.png"
-                visible:                root.repository && root.repository.refreshing
+                visible:                root.repository && root.repository.updating
+            }
+            Image {
+                id: theFetchIcon
+                Layout.preferredWidth:  theNameLabel.height
+                Layout.preferredHeight: theNameLabel.height
+                fillMode:               Image.Stretch
+                source:                 "../fetch.png"
+                visible:                root.repository && root.repository.fetching
             }
         }
         LabelValueRow {
