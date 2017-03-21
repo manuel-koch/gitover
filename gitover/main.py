@@ -69,7 +69,7 @@ def setupLogging(verbose, path=None):
 def main():
     "Main entry point of program"
     parser = argparse.ArgumentParser(description="""Show git overview in graphical widget.""")
-    parser.add_argument('repos', nargs="+")
+    parser.add_argument('repos', nargs="*")
     grpMisc = parser.add_argument_group('Misc')
     grpMisc.add_argument('--version', action='version', version='%(prog)s')
     grpMisc.add_argument('--verbose', dest='verbose', action="store_true",
