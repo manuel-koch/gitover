@@ -42,6 +42,7 @@ Item {
         Item {
             id: theContent
             Layout.fillWidth: true
+            Layout.alignment: Qt.AlignTop
             height:           childrenRect.height
 
             onChildrenChanged: {
