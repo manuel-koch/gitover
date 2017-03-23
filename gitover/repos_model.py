@@ -130,7 +130,7 @@ class GitStatus(object):
         self.trackingBranchAhead = 0
         self.trackingBranchBehind = 0
         self.trunkBranch = ""
-        self.trunkBranch_ahead = 0
+        self.trunkBranchAhead = 0
         self.trunkBranchBehind = 0
 
     def update(self):
