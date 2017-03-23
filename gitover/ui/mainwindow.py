@@ -78,7 +78,7 @@ def run_gui(repo_paths):
     app.setOrganizationDomain("mko.com")
     app.setApplicationName("GitOver")
     app.setApplicationVersion("{}".format(__version__))
-    #app.setWindowIcon(QIcon(':/icon.png')) # FIXME
+    app.setWindowIcon(QIcon(':/icon.png'))
     QThread.currentThread().setObjectName('mainThread')
 
     qInstallMessageHandler(messageHandler)

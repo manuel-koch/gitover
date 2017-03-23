@@ -3,5 +3,6 @@
 *.pyc
 *.qmlc
 *.spec
+res/icon.icns
 dist/
 build/

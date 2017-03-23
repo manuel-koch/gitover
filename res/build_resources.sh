@@ -10,9 +10,9 @@ echo "to   ${OUT}"
 [ -s "$OUT" ] && rm "$OUT"
 pyrcc5 -o "$OUT" "$IN" && echo Done
 
-#IN=${BASE_DIR}/utilities-system-monitor-icon.png
-#OUT=${BASE_DIR}/utilities-system-monitor-icon.icns
-#echo "Building Iconset..."
-#echo "from ${IN}"
-#echo "to   ${OUT}"
-#sips -s format icns "$IN" --out "$OUT"
+IN=${BASE_DIR}/icon.png
+OUT=${BASE_DIR}/icon.icns
+echo "Building Iconset..."
+echo "from ${IN}"
+echo "to   ${OUT}"
+sips -s format icns "$IN" --out "$OUT"

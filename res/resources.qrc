@@ -5,6 +5,7 @@
     <file>qml/LabelValueRow.qml</file>
     <file>qml/RepoDetailView.qml</file>
     <file>qml/RepoView.qml</file>
+    <file>icon.png</file>
     <file>fetch.png</file>
     <file>status.png</file>
 </qresource>
