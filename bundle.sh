@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 res/build_resources.sh
 
 # Somehow PyInstaller is unable to find PyQt5 stuff automatically.
