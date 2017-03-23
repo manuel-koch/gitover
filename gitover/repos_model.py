@@ -24,6 +24,7 @@ Data model for all repositiories.
 import logging
 import os
 import random
+import subprocess
 import threading
 import time
 
@@ -35,6 +36,7 @@ from PyQt5.QtCore import QAbstractItemModel
 from PyQt5.QtCore import QThread
 
 from gitover.qml_helpers import QmlTypeMixin
+from gitover.config import Config
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,6 +52,12 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         """Construct repositories model"""
         super().__init__(parent)
         self._repos = []
+
+        cfg = Config()
+        cfg.load(os.path.expanduser("~"))
+        gitexe = cfg.general()["git"]
+        if gitexe:
+            git.Git.GIT_PYTHON_GIT_EXECUTABLE = gitexe
 
     def roleNames(self):
         roles = super().roleNames()
@@ -76,6 +84,10 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
             return QVariant(repo)
 
         return None
+
+    @pyqtSlot(int, result="QVariant")
+    def repo(self, idx):
+        return self.data(self.index(idx, 0), role=ReposModel.ROLE_REPO)
 
     @pyqtSlot()
     def triggerUpdate(self):
@@ -132,6 +144,9 @@ class GitStatus(object):
         self.trunkBranch = ""
         self.trunkBranchAhead = 0
         self.trunkBranchBehind = 0
+        self.untracked = []
+        self.deleted = []
+        self.modified = []
 
     def update(self):
         """Update info from current git repository"""
@@ -177,6 +192,14 @@ class GitStatus(object):
         except:
             LOGGER.exception(
                 "Failed to get trunk branch ahead/behind counters for {}".format(self.path))
+
+        self.untracked = repo.untracked_files
+        for diff in repo.index.diff(other=None):  # diff against working tree
+            if diff.deleted_file:
+                self.deleted += [diff.b_path]
+            else:
+                self.modified += [diff.b_path]
+        pass
 
 
 class GitStatusWorker(QObject):
@@ -261,13 +284,17 @@ class Repo(QObject, QmlTypeMixin):
     pathChanged = pyqtSignal(str)
     nameChanged = pyqtSignal(str)
     branchChanged = pyqtSignal(str)
+    branchesChanged = pyqtSignal("QStringList")
     trackingBranchChanged = pyqtSignal(str)
     trackingBranchAheadChanged = pyqtSignal(int)
     trackingBranchBehindChanged = pyqtSignal(int)
     trunkBranchChanged = pyqtSignal(str)
     trunkBranchAheadChanged = pyqtSignal(int)
     trunkBranchBehindChanged = pyqtSignal(int)
-    branchesChanged = pyqtSignal("QStringList")
+    untrackedChanged = pyqtSignal("QStringList")
+    modifiedChanged = pyqtSignal("QStringList")
+    deletedChanged = pyqtSignal("QStringList")
+
     updatingChanged = pyqtSignal(bool)
     fetchingChanged = pyqtSignal(bool)
 
@@ -291,13 +318,16 @@ class Repo(QObject, QmlTypeMixin):
         self._fetchWorker.fetchprogress.connect(self._setFetching)
 
         self._branch = ""
+        self._branches = []
         self._tracking_branch = ""
         self._tracking_branch_ahead = 0
         self._tracking_branch_behind = 0
         self._trunk_branch = ""
         self._trunk_branch_ahead = 0
         self._trunk_branch_behind = 0
-        self._branches = []
+        self._untracked = []
+        self._modified = []
+        self._deleted = []
 
         self._updating = False
         self._updateTriggered = False
@@ -367,6 +397,40 @@ class Repo(QObject, QmlTypeMixin):
         self.trunkBranch = status.trunkBranch
         self.trunkBranch_ahead = status.trunkBranchAhead
         self.trunkBranch_behind = status.trunkBranchBehind
+        self.untracked = status.untracked
+        self.modified = status.modified
+        self.deleted = status.deleted
+
+    def _config(self):
+        cfg = Config()
+        cfg.load(self._path)
+        return cfg
+
+    @pyqtSlot(str)
+    def execCmd(self, name):
+        """Executes a named command for current repository"""
+        cfg = self._config()
+        tool = cfg.tool(name)
+        if not tool:
+            return
+
+        def substVar(txt, variables):
+            "Substite named variables in given string"
+            for name, value in variables.items():
+                txt = txt.replace("{{{}}}".format(name), value)
+            return txt
+
+        vars = {"root": self._path}
+        cmd = substVar(tool["cmd"], vars)
+        cwd = self._path
+        LOGGER.info("Executing command {}:\n\tCommand: {}\n\tCwd: {}".format(name, cmd, cwd))
+        subprocess.Popen(cmd, shell=True, cwd=cwd, executable="/bin/bash")
+
+    @pyqtSlot(result=QVariant)
+    def cmds(self):
+        """Returns a list of dict with keys name,title to configure commands for current repository"""
+        cfg = self._config()
+        return QVariant(cfg.tools())
 
     @pyqtProperty(str, notify=pathChanged)
     def path(self):
@@ -467,3 +531,33 @@ class Repo(QObject, QmlTypeMixin):
         if self._branches != branches:
             self._branches = branches
             self.branchesChanged.emit(self._branches)
+
+    @pyqtProperty("QStringList", notify=untrackedChanged)
+    def untracked(self):
+        return self._untracked
+
+    @untracked.setter
+    def untracked(self, untracked):
+        if self._untracked != untracked:
+            self._untracked = untracked
+            self.untrackedChanged.emit(self._untracked)
+
+    @pyqtProperty("QStringList", notify=modifiedChanged)
+    def modified(self):
+        return self._modified
+
+    @modified.setter
+    def modified(self, modified):
+        if self._modified != modified:
+            self._modified = modified
+            self.modifiedChanged.emit(self._modified)
+
+    @pyqtProperty("QStringList", notify=deletedChanged)
+    def deleted(self):
+        return self._deleted
+
+    @deleted.setter
+    def deleted(self, deleted):
+        if self._deleted != deleted:
+            self._deleted = deleted
+            self.deletedChanged.emit(self._deleted)

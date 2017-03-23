@@ -31,7 +31,7 @@ Rectangle {
         interval:    5*60*1000 // 5 minutes
         repeat:      true
         running:     true
-        onTriggered: globalRepositories.refresh()
+        onTriggered: globalRepositories.triggerUpdate()
     }
 
     FileDialog {
@@ -97,13 +97,30 @@ Rectangle {
                 width:      theRepoGrid.cellWidth-2
                 height:     theRepoGrid.cellHeight-2
                 onClicked:  theRepoGrid.currentIndex = index
+                color:      isCurrent ? "#fffeee" : "transparent"
+                property bool isCurrent: theRepoGrid.currentIndex == index
             }
 
             // Doesn't work in frozen/bundled application
             //ScrollIndicator.vertical:   ScrollIndicator { }
             //ScrollIndicator.horizontal: ScrollIndicator { }
 
-            onCurrentIndexChanged: console.debug("currentIndex",currentIndex)
+            onCurrentIndexChanged: {
+                console.debug("currentIndex",currentIndex)
+                if( currentIndex != -1 )
+                    theRepoDetail.repository = globalRepositories.repo( currentIndex )
+                else
+                    theRepoDetail.repository = null
+            }
+
+            onCountChanged: currentIndex = -1
+        }
+
+        RepoDetailView {
+            id: theRepoDetail
+            repository: null
+            Layout.fillWidth:  true
+            Layout.preferredHeight: root.height / 3
         }
     }
 }
