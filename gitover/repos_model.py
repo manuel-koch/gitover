@@ -410,6 +410,14 @@ class Repo(QObject, QmlTypeMixin):
     def execCmd(self, name):
         """Executes a named command for current repository"""
         cfg = self._config()
+
+        if name == "update":
+            self.triggerUpdate()
+            return
+        if name == "fetch":
+            self.triggerFetch()
+            return
+
         tool = cfg.tool(name)
         if not tool:
             return
@@ -430,7 +438,11 @@ class Repo(QObject, QmlTypeMixin):
     def cmds(self):
         """Returns a list of dict with keys name,title to configure commands for current repository"""
         cfg = self._config()
-        return QVariant(cfg.tools())
+        tools = [{"name": "update", "title": "Refresh"},
+                 {"name": "fetch", "title": "Fetch"},
+                 {"title": ""}]
+        tools += cfg.tools()
+        return QVariant(tools)
 
     @pyqtProperty(str, notify=pathChanged)
     def path(self):

@@ -40,6 +40,8 @@ from PyQt5.QtQuick import QQuickView
 import gitover.ui.resources  # Only need this to get access to embedded Qt resources
 from gitover.repos_model import ReposModel, Repo
 
+__version__ = "0.1.0"
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -73,9 +75,10 @@ def run_gui(repo_paths):
     # Customize application
     app = QGuiApplication([])
     app.setOrganizationName("MKO")
-    app.setOrganizationDomain("mko.gitover.com")
+    app.setOrganizationDomain("mko.com")
     app.setApplicationName("GitOver")
-    # app.setWindowIcon(QIcon(':/icon.png')) # FIXME
+    app.setApplicationVersion("{}".format(__version__))
+    #app.setWindowIcon(QIcon(':/icon.png')) # FIXME
     QThread.currentThread().setObjectName('mainThread')
 
     qInstallMessageHandler(messageHandler)

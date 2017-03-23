@@ -67,9 +67,17 @@ Rectangle {
             clearMenu()
             var cmds = repository.cmds()
             for(var i=0; i<cmds.length; i++) {
-                console.debug("Creating menu '"+cmds[i].title+"' for",repository.name)
-                var newMenuItem = Qt.createQmlObject('import QtQuick.Controls 1.4; MenuItem {text: "'+cmds[i].title+'"; onTriggered: repository.execCmd("'+cmds[i].name+'")}',
+                var newMenuItem
+                if( cmds[i].title ) {
+                    console.debug("Creating menu '"+cmds[i].title+"' for",repository.name)
+                    newMenuItem = Qt.createQmlObject('import QtQuick.Controls 1.4; MenuItem {text: "'+cmds[i].title+'"; onTriggered: repository.execCmd("'+cmds[i].name+'")}',
                                                      theMenu, "dynamicMenuItem"+i);
+                }
+                else {
+                    console.debug("Creating menu separator")
+                    newMenuItem = Qt.createQmlObject('import QtQuick.Controls 1.4; MenuSeparator {}',
+                                                     theMenu, "dynamicMenuItem"+i);
+                }
                 theMenu.insertItem(i,newMenuItem)
                 dynMenuItems.push(newMenuItem)
             }
