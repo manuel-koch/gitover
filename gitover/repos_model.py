@@ -212,7 +212,7 @@ class GitFetchWorker(QObject):
 
     concurrent_fetch_count = 0
     concurrent_fetch_lock = threading.Lock()
-    max_concurrent_fetch_count = 5
+    max_concurrent_fetch_count = 8
 
     # signal gets emitted to trigger updating given repo root path
     fetch = pyqtSignal(str)
