@@ -29,12 +29,14 @@ import threading
 import time
 
 import git
+
 from PyQt5.QtCore import QModelIndex, pyqtSlot
 from PyQt5.QtCore import QVariant
 from PyQt5.QtCore import Qt, pyqtProperty, pyqtSignal, QObject
 from PyQt5.QtCore import QAbstractItemModel
 from PyQt5.QtCore import QThread
 
+from gitover.fswatcher import RepoFsWatcher
 from gitover.qml_helpers import QmlTypeMixin
 from gitover.config import Config
 
@@ -51,6 +53,13 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
     def __init__(self, parent=None):
         """Construct repositories model"""
         super().__init__(parent)
+        self._workerThread = QThread(self, objectName="workerThread")
+        self._workerThread.start()
+
+        self._fsHandler = RepoFsWatcher()
+        self._fsHandler.moveToThread(self._workerThread)
+        self._fsHandler.repoChanged.connect(self._onRepoChanged)
+
         self._repos = []
 
         cfg = Config()
@@ -101,8 +110,16 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
 
     @pyqtSlot()
     def stopWorker(self):
+        LOGGER.debug("Stopping workers...")
         for repo in self._repos:
             repo.stopWorker()
+
+        self._fsHandler.stopTracking()
+
+        if self._workerThread.isRunning():
+            self._workerThread.quit()
+            self._workerThread.wait()
+        LOGGER.debug("Stopped worker")
 
     @pyqtProperty(int, notify=nofReposChanged)
     def nofRepos(self):
@@ -131,6 +148,20 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         for subpath in subpaths:
             name = subpath[len(rootpath) + 1:]
             self.addRepo(Repo(subpath, name))
+
+        # FIXME: performance drawback
+        #        don't want to track root repository because that will trigger tracking all sub-repos too !?
+        if not subpaths:
+            # starting to track huge directory structure can take long, using worker to start tracking
+            self._fsHandler.track.emit(repo.path)
+
+    def _onRepoChanged(self, path):
+        roots = [(repo.path, repo) for repo in self._repos]
+        roots.sort(key=lambda x: len(x[0]), reverse=True)
+        for root, repo in roots:
+            if path == root or path.startswith(root + os.sep):
+                repo.triggerUpdate()
+                return
 
 
 class GitStatus(object):
@@ -173,12 +204,13 @@ class GitStatus(object):
             if self.branch and self.branch != "detached":
                 remote = repo.git.config("branch.{}.remote".format(self.branch))
                 self.trackingBranch = "{}/{}".format(remote, self.branch)
-                ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trackingBranch),
-                                                  left_right=True, count=True).split("\t")
-                self.trackingBranchAhead, self.trackingBranchBehind = int(ahead), int(behind)
+                if self.trackingBranch in repo.refs:
+                    ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trackingBranch),
+                                                      left_right=True, count=True).split("\t")
+                    self.trackingBranchAhead, self.trackingBranchBehind = int(ahead), int(behind)
         except:
-            LOGGER.exception(
-                "Failed to get tracking branch ahead/behind counters for {}".format(self.path))
+            LOGGER.exception("Failed to get tracking branch ahead/behind counters for {}"
+                             .format(self.path))
 
         try:
             if self.branch and self.branch != "detached":

@@ -26,14 +26,6 @@ Rectangle {
     anchors.fill: parent
     color:        "white"
 
-    Timer {
-        id: theRefreshTimer
-        interval:    5*60*1000 // 5 minutes
-        repeat:      true
-        running:     true
-        onTriggered: globalRepositories.triggerUpdate()
-    }
-
     FileDialog {
         id: theAddRepoDialog
         title: "Please choose a file"
