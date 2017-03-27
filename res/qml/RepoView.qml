@@ -198,12 +198,13 @@ Rectangle {
             label:      "Changes:"
             width:      theColumn.width
             labelWidth: internal.labelWidth
+            height:     theChangesText.implicitHeight
             Text {
                 id: theChangesText
                 font.pointSize: internal.labelFontSize
                 elide:          Text.ElideRight
                 text:           getChangesNums(modified,deleted,untracked)
-
+                wrapMode:       Text.Wrap
                 /*
                 FIXME: Popup causes problems when bundling/freezing with PyInstaller !?
                 MouseArea {
