@@ -17,7 +17,7 @@
 //
 import QtQuick 2.6
 import QtQuick.Layouts 1.2
-import QtQuick.Controls 2.1
+import QtQuick.Controls 1.4
 import Gitover 1.0
 
 Item {
@@ -36,6 +36,7 @@ Item {
         Text {
             id: theLabel
             Layout.preferredWidth: root.labelWidth
+            Layout.alignment:      Qt.AlignTop
             color:                 "black"
             font.pointSize:        10
         }
