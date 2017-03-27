@@ -28,9 +28,9 @@ Rectangle {
 
     FileDialog {
         id: theAddRepoDialog
-        title: "Please choose a file"
-        folder: shortcuts.home
-        selectFolder: true
+        title:          "Please choose a file"
+        folder:         shortcuts.home
+        selectFolder:   true
         selectExisting: true
         onAccepted: {
             console.log("You chose: " + theAddRepoDialog.fileUrls)
@@ -39,13 +39,14 @@ Rectangle {
     }
 
     ColumnLayout {
-        anchors.fill: parent
+        anchors.fill:    parent
         anchors.margins: 2
+        spacing:         2
 
         Row {
-            Layout.fillWidth:  true
-            height: 20
-            spacing: 8
+            Layout.fillWidth: true
+            height:           20
+            spacing:          8
             Text {
                 visible: globalRepositories.nofRepos != 0
                 color:   "black"
@@ -80,22 +81,23 @@ Rectangle {
             snapMode:          GridView.SnapToRow
             boundsBehavior:    Flickable.StopAtBounds
 
+            property int cellSpacing: 2
             property int cellsPerRow: 5
 
             model: globalRepositories
 
             delegate: RepoView {
                 repository: repo
-                width:      theRepoGrid.cellWidth-2
-                height:     theRepoGrid.cellHeight-2
+                width:      theRepoGrid.cellWidth - ( isLastColumn ? 0 : theRepoGrid.cellSpacing)
+                height:     theRepoGrid.cellHeight - ( isLastRow ? 0 : theRepoGrid.cellSpacing)
                 onClicked:  theRepoGrid.currentIndex = index
                 color:      isCurrent ? "#fffeee" : "transparent"
-                property bool isCurrent: theRepoGrid.currentIndex == index
+                property bool isCurrent:    theRepoGrid.currentIndex == index
+                property int  column:       index % theRepoGrid.cellsPerRow
+                property int  row:          Math.floor( index / theRepoGrid.cellsPerRow )
+                property bool isLastColumn: (column+1) == theRepoGrid.cellsPerRow
+                property bool isLastRow:    row == Math.floor(theRepoGrid.count / theRepoGrid.cellsPerRow)
             }
-
-            // Doesn't work in frozen/bundled application
-            //ScrollIndicator.vertical:   ScrollIndicator { }
-            //ScrollIndicator.horizontal: ScrollIndicator { }
 
             onCurrentIndexChanged: {
                 console.debug("currentIndex",currentIndex)
