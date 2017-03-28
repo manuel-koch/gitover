@@ -48,6 +48,7 @@ Rectangle {
                 root.clicked()
             }
         }
+        onDoubleClicked: repository.triggerUpdate()
     }
 
     Menu {
@@ -203,7 +204,7 @@ Rectangle {
                 id: theChangesText
                 font.pointSize: internal.labelFontSize
                 elide:          Text.ElideRight
-                text:           getChangesNums(modified,deleted,untracked)
+                text:           getChangesNums(modified,deleted,untracked,conflicts,staged)
                 wrapMode:       Text.Wrap
                 /*
                 FIXME: Popup causes problems when bundling/freezing with PyInstaller !?
@@ -250,47 +251,47 @@ Rectangle {
                 }
                 */
 
-                property bool hasChanges: untracked || modified || deleted
+                property bool hasChanges: untracked || modified || deleted || conflicts || staged
                 property int untracked: root.repository ? root.repository.untracked.length : 0
                 property int modified: root.repository ? root.repository.modified.length : 0
                 property int deleted: root.repository ? root.repository.deleted.length : 0
+                property int conflicts: root.repository ? root.repository.conflicts.length : 0
+                property int staged: root.repository ? root.repository.staged.length : 0
                 property string tooltipText: ""
 
-                function getChangesNums(m,d,u) {
+                function getChangesNums(m,d,u,c,s) {
                     var t = []
+                    if( s )
+                        t.push("<font color='#C1036E'>"+s+"-S</font>")
+                    if( c )
+                        t.push("<font color='#950000'>"+c+"-C</font>")
                     if( m )
-                        t.push("<font color='magenta'>"+modified+" modified</font>")
+                        t.push("<font color='#007272'>"+m+"-M</font>")
                     if( d )
-                        t.push("<font color='red'>"+deleted+" deleted</font>")
+                        t.push("<font color='#F00303'>"+d+"-D</font>")
                     if( u )
-                        t.push("<font color='orange'>"+untracked+" untracked</font>")
-                    if( !m && !d && !u )
-                        t.push("<font color='green'>up-to-date</font>")
+                        t.push("<font color='#F06E03'>"+u+"-U</font>")
+                    if( !m && !d && !u && !c && !s)
+                        t.push("<font color='#03C003'>up-to-date</font>")
                     return t.join(", ")
                 }
 
                 function getChanges() {
                     var t = []
-
-                    if( root.repository.modified.length ){
-                        t.push("<b>modified:</b>")
-                        for(var i=0;i<root.repository.modified.length;i++)
-                            t.push("&nbsp;&nbsp;"+root.repository.modified[i])
-                    }
-
-                    if( root.repository.deleted.length ){
-                        t.push("<b>deleted:</b>")
-                        for(var i=0;i<root.repository.deleted.length;i++)
-                            t.push("&nbsp;&nbsp;"+root.repository.deleted[i])
-                    }
-
-                    if( root.repository.untracked.length ){
-                        t.push("<b>untracked:</b>")
-                        for(var i=0;i<root.repository.untracked.length;i++)
-                            t.push("&nbsp;&nbsp;"+root.repository.untracked[i])
-                    }
-
+                    appendToArray(t,root.repository.staged,"staged")
+                    appendToArray(t,root.repository.conflicts,"conflicts")
+                    appendToArray(t,root.repository.modified,"modified")
+                    appendToArray(t,root.repository.deleted,"deleted")
+                    appendToArray(t,root.repository.untracked,"untracked")
                     return t.join("<br>")
+                }
+
+                function appendToArray(target,source,title) {
+                    if( source.length ){
+                        target.push("<b>"+title+":</b>")
+                        for(var i=0;i<source.length;i++)
+                            t.push("&nbsp;&nbsp;"+source[i])
+                    }
                 }
             }
         }

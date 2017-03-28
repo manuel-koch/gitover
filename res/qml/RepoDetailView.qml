@@ -54,6 +54,38 @@ Rectangle {
             }
             Text {
                 Layout.fillWidth: true
+                text:             nofStaged + " staged files:"
+                font.bold:        true
+                visible:          nofStaged
+                property int nofStaged: repository != null ? repository.staged.length : 0
+            }
+            Repeater {
+                Layout.fillWidth: true
+                model:            repository != null ? repository.staged : null
+                Text {
+                    text:           modelData
+                    leftPadding:    10
+                    font.pointSize: 10
+                }
+            }
+            Text {
+                Layout.fillWidth: true
+                text:             nofConflicts + " conflicting files:"
+                font.bold:        true
+                visible:          nofConflicts
+                property int nofConflicts: repository != null ? repository.conflicts.length : 0
+            }
+            Repeater {
+                Layout.fillWidth: true
+                model:            repository != null ? repository.conflicts : null
+                Text {
+                    text:           modelData
+                    leftPadding:    10
+                    font.pointSize: 10
+                }
+            }
+            Text {
+                Layout.fillWidth: true
                 text:             nofModified + " modified files:"
                 font.bold:        true
                 visible:          nofModified
