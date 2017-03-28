@@ -172,9 +172,11 @@ class GitStatus(object):
         self.trunkBranch = ""
         self.trunkBranchAhead = 0
         self.trunkBranchBehind = 0
-        self.untracked = []
-        self.deleted = []
-        self.modified = []
+        self.untracked = set()
+        self.deleted = set()
+        self.modified = set()
+        self.conflicts = set()
+        self.staged = set()
 
     def update(self):
         """Update info from current git repository"""
@@ -199,35 +201,59 @@ class GitStatus(object):
 
         try:
             if self.branch and self.branch != "detached":
-                remote = repo.git.config("branch.{}.remote".format(self.branch))
-                self.trackingBranch = "{}/{}".format(remote, self.branch)
-                if self.trackingBranch in repo.refs:
-                    ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trackingBranch),
-                                                      left_right=True, count=True).split("\t")
-                    self.trackingBranchAhead, self.trackingBranchBehind = int(ahead), int(behind)
+                remote = repo.git.config("branch.{}.remote".format(self.branch),
+                                         with_exceptions=False)
+                if remote:
+                    self.trackingBranch = "{}/{}".format(remote, self.branch)
+                    if self.trackingBranch in repo.refs:
+                        ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trackingBranch),
+                                                          left_right=True, count=True).split("\t")
+                        self.trackingBranchAhead, self.trackingBranchBehind = int(ahead), int(
+                            behind)
         except:
             LOGGER.exception("Failed to get tracking branch ahead/behind counters for {}"
                              .format(self.path))
 
         try:
             if self.branch and self.branch != "detached":
-                try:
-                    self.trunkBranch = repo.git.config("custom.devbranch")
-                except git.GitCommandError:
+                self.trunkBranch = repo.git.config("custom.devbranch", with_exceptions=False)
+                if not self.trunkBranch:
                     self.trunkBranch = "origin/develop"
-                ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trunkBranch),
-                                                  left_right=True, count=True).split("\t")
-                self.trunkBranchAhead, self.trunkBranchBehind = int(ahead), int(behind)
+                if self.trunkBranch in repo.refs:
+                    ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trunkBranch),
+                                                      left_right=True, count=True).split("\t")
+                    self.trunkBranchAhead, self.trunkBranchBehind = int(ahead), int(behind)
         except:
             LOGGER.exception(
                 "Failed to get trunk branch ahead/behind counters for {}".format(self.path))
 
-        self.untracked = repo.untracked_files
+        self.untracked = set(repo.untracked_files)
         for diff in repo.index.diff(other=None):  # diff against working tree
             if diff.deleted_file:
-                self.deleted += [diff.b_path]
+                self.deleted.add(diff.b_path)
             else:
-                self.modified += [diff.b_path]
+                self.modified.add(diff.b_path)
+
+        try:
+            unmergedBlobs = repo.index.unmerged_blobs()
+            for path in unmergedBlobs:
+                for (stage, dummyBlob) in unmergedBlobs[path]:
+                    if stage != 0:  # anything else than zero indicates a conflict that must be resolved
+                        self.conflicts.add(path)
+        except:
+            pass  # unmerged_blobs() seems to raise an exception when there are no conflicts !?
+
+        try:
+            for p in [p for p in repo.git.diff("HEAD", name_only=True).split("\n") if p.strip()]:
+                if p not in self.modified and p not in self.deleted:
+                    self.staged.add(p)
+        except:
+            pass
+
+        self.modified -= self.conflicts
+        self.deleted -= self.conflicts
+        self.staged -= self.conflicts
+
         pass
 
 
@@ -323,6 +349,8 @@ class Repo(QObject, QmlTypeMixin):
     untrackedChanged = pyqtSignal("QStringList")
     modifiedChanged = pyqtSignal("QStringList")
     deletedChanged = pyqtSignal("QStringList")
+    conflictsChanged = pyqtSignal("QStringList")
+    stagedChanged = pyqtSignal("QStringList")
 
     updatingChanged = pyqtSignal(bool)
     fetchingChanged = pyqtSignal(bool)
@@ -331,7 +359,7 @@ class Repo(QObject, QmlTypeMixin):
         super().__init__(parent)
         self.destroyed.connect(self.stopWorker)
 
-        self._path = path
+        self._path = os.path.normpath(os.path.abspath(path))
         self._name = name or os.path.basename(self._path)
 
         self._workerThread = QThread(self, objectName="workerThread-{}".format(name))
@@ -357,6 +385,8 @@ class Repo(QObject, QmlTypeMixin):
         self._untracked = []
         self._modified = []
         self._deleted = []
+        self._conflicts = []
+        self._staged = []
 
         self._updating = False
         self._updateTriggered = False
@@ -418,17 +448,23 @@ class Repo(QObject, QmlTypeMixin):
 
     @pyqtSlot(object)
     def _onStatusUpdated(self, status):
+        def sorteditems(it):
+            l = list(it)
+            l.sort(key=str.lower)
+            return l
         self.branch = status.branch
-        self.branches = status.branches
+        self.branches = sorteditems(status.branches)
         self.trackingBranch = status.trackingBranch
         self.trackingBranchAhead = status.trackingBranchAhead
         self.trackingBranchBehind = status.trackingBranchBehind
         self.trunkBranch = status.trunkBranch
-        self.trunkBranch_ahead = status.trunkBranchAhead
-        self.trunkBranch_behind = status.trunkBranchBehind
-        self.untracked = status.untracked
-        self.modified = status.modified
-        self.deleted = status.deleted
+        self.trunkBranchAhead = status.trunkBranchAhead
+        self.trunkBranchBehind = status.trunkBranchBehind
+        self.untracked = sorteditems(status.untracked)
+        self.modified = sorteditems(status.modified)
+        self.deleted = sorteditems(status.deleted)
+        self.conflicts = sorteditems(status.conflicts)
+        self.staged = sorteditems(status.staged)
 
     def _config(self):
         cfg = Config()
@@ -602,3 +638,23 @@ class Repo(QObject, QmlTypeMixin):
         if self._deleted != deleted:
             self._deleted = deleted
             self.deletedChanged.emit(self._deleted)
+
+    @pyqtProperty("QStringList", notify=conflictsChanged)
+    def conflicts(self):
+        return self._conflicts
+
+    @conflicts.setter
+    def conflicts(self, conflicts):
+        if self._conflicts != conflicts:
+            self._conflicts = conflicts
+            self.conflictsChanged.emit(self._conflicts)
+
+    @pyqtProperty("QStringList", notify=stagedChanged)
+    def staged(self):
+        return self._staged
+
+    @staged.setter
+    def staged(self, staged):
+        if self._staged != staged:
+            self._staged = staged
+            self.stagedChanged.emit(self._staged)
