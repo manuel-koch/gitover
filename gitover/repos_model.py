@@ -152,12 +152,6 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
             name = subpath[len(rootpath) + 1:]
             self.addRepo(Repo(subpath, name))
 
-        # FIXME: performance drawback
-        #        don't want to track root repository because that will trigger tracking all sub-repos too !?
-        if not subpaths:
-            # starting to track huge directory structure can take long, using worker to start tracking
-            self._fsHandler.track.emit(repo.path)
-
     def _onRepoChanged(self, path):
         roots = [(repo.path, repo) for repo in self._repos]
         roots.sort(key=lambda x: len(x[0]), reverse=True)
