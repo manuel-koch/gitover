@@ -135,6 +135,9 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
             LOGGER.exception("Path is not a git repo: {}".format(path))
 
     def addRepo(self, repo):
+        if any([r.path == repo.path for r in self._repos]):
+            return
+
         self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
         repo.setParent(self)
         self._repos += [repo]
