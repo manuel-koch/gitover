@@ -56,9 +56,9 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         self._workerThread = QThread(self, objectName="workerThread")
         self._workerThread.start()
 
-        self._fsHandler = RepoFsWatcher()
-        self._fsHandler.moveToThread(self._workerThread)
-        self._fsHandler.repoChanged.connect(self._onRepoChanged)
+        self._fsWatcher = RepoFsWatcher()
+        self._fsWatcher.moveToThread(self._workerThread)
+        self._fsWatcher.repoChanged.connect(self._onRepoChanged)
 
         self._repos = []
 
@@ -109,12 +109,20 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
             repo.triggerFetch()
 
     @pyqtSlot()
+    def cleanup(self):
+        self.stopWorker()
+        self.beginResetModel()
+        self._repos = []
+        self.endResetModel()
+        self.nofReposChanged.emit(self.nofRepos)
+
+    @pyqtSlot()
     def stopWorker(self):
         LOGGER.debug("Stopping workers...")
         for repo in self._repos:
             repo.stopWorker()
 
-        self._fsHandler.stopTracking()
+        self._fsWatcher.stopTracking()
 
         if self._workerThread.isRunning():
             self._workerThread.quit()
@@ -151,6 +159,8 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         for subpath in subpaths:
             name = subpath[len(rootpath) + 1:]
             self.addRepo(Repo(subpath, name))
+
+        self._fsWatcher.track.emit(rootpath)
 
     def _onRepoChanged(self, path):
         roots = [(repo.path, repo) for repo in self._repos]

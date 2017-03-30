@@ -127,7 +127,8 @@ def run_gui(repo_paths):
     settings.setValue("height", view.height())
     settings.endGroup()
 
-    repos.stopWorker()
+    repos.cleanup()
+    wnd = None
     repos = None
     view = None
 
