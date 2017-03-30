@@ -190,7 +190,10 @@ class GitStatus(object):
         try:
             self.branch = repo.active_branch.name
         except TypeError:
-            self.branch = "detached"
+            if repo.head and repo.head.commit:
+                self.branch = "detached {}".format(repo.git.rev_parse(repo.head.commit.hexsha, short=8))
+            else:
+                self.branch = ""
 
         try:
             branches = [b.name for b in repo.branches]
@@ -200,7 +203,7 @@ class GitStatus(object):
             LOGGER.exception("Invalid branches for {}".format(self.path))
 
         try:
-            if self.branch and self.branch != "detached":
+            if self.branch in self.branches:
                 remote = repo.git.config("branch.{}.remote".format(self.branch),
                                          with_exceptions=False)
                 if remote:
@@ -215,14 +218,13 @@ class GitStatus(object):
                              .format(self.path))
 
         try:
-            if self.branch and self.branch != "detached":
-                self.trunkBranch = repo.git.config("custom.devbranch", with_exceptions=False)
-                if not self.trunkBranch:
-                    self.trunkBranch = "origin/develop"
-                if self.trunkBranch in repo.refs:
-                    ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trunkBranch),
-                                                      left_right=True, count=True).split("\t")
-                    self.trunkBranchAhead, self.trunkBranchBehind = int(ahead), int(behind)
+            self.trunkBranch = repo.git.config("custom.devbranch", with_exceptions=False)
+            if not self.trunkBranch:
+                self.trunkBranch = "origin/develop"
+            if self.trunkBranch in repo.refs:
+                ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trunkBranch),
+                                                  left_right=True, count=True).split("\t")
+                self.trunkBranchAhead, self.trunkBranchBehind = int(ahead), int(behind)
         except:
             LOGGER.exception(
                 "Failed to get trunk branch ahead/behind counters for {}".format(self.path))
