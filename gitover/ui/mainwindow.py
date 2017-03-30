@@ -34,6 +34,7 @@ from PyQt5.QtCore import QUrl
 from PyQt5.QtCore import QTimer
 from PyQt5.QtCore import QSettings
 from PyQt5.QtGui import QGuiApplication, QIcon, QPixmap, QPainter, QColor, QFont, QTextOption
+from PyQt5.QtQml import QQmlApplicationEngine
 from PyQt5.QtWidgets import QSystemTrayIcon
 from PyQt5.QtQuick import QQuickView
 
@@ -55,22 +56,17 @@ def messageHandler(msgType, context, msg):
     else:
         logfunc = LOGGER.info
     logfunc("{}({}): {}".format(context.file, context.line, msg))
-
-
-class MainWindow(QQuickView):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.statusChanged.connect(self._handleStatusChange)
-
-    def _handleStatusChange(self, status):
-        if status == QQuickView.Error:
-            for err in self.errors():
-                LOGGER.error("{}".format(err.toString()))
+    if "Must construct a QGuiApplication first." in msg:
+        print("CATCH ME")
+        import traceback
+        traceback.print_stack()
 
 
 def run_gui(repo_paths):
     """Run GUI application"""
     base_dir = os.path.join(os.path.dirname(__file__), "..", "..")
+
+    LOGGER.info("Starting...")
 
     # Customize application
     app = QGuiApplication([])
@@ -94,42 +90,45 @@ def run_gui(repo_paths):
     h = settings.value("height", 600)
     settings.endGroup()
 
-    view = MainWindow()
-
     repos = ReposModel()
     for rootpath in repo_paths:
         repos.addRepo(Repo(rootpath))
 
-    view.engine().setOutputWarningsToStandardError(True)
-    view.engine().rootContext().setContextProperty("globalRepositories", repos)
-    view.setResizeMode(QQuickView.SizeRootObjectToView)
-    if getattr(sys,'frozen',False):
-        view.setSource(QUrl("qrc:/qml/Main.qml"))
+    engine = QQmlApplicationEngine(app)
+    engine.setOutputWarningsToStandardError(True)
+    engine.rootContext().setContextProperty("globalRepositories", repos)
+    if getattr(sys, 'frozen', False):
+        engine.load(QUrl("qrc:/qml/Main.qml"))
     else:
-        view.setSource(QUrl.fromLocalFile(os.path.join(base_dir, 'res/qml/Main.qml')))
-    view.setTitle(app.applicationName())
-    view.setWidth(w)
-    view.setHeight(h)
+        engine.load(QUrl.fromLocalFile(os.path.join(base_dir, 'res/qml/Main.qml')))
+
+    wnd = engine.rootObjects()[0]
+    wnd.title = app.applicationName()
+    wnd.setProperty("title", app.applicationName())
+    wnd.setProperty("width", w)
+    wnd.setProperty("height", h)
     if x is not None:
-        view.setX(x)
+        wnd.setProperty("x", x)
     if y is not None:
-        view.setY(y)
-    view.show()
+        wnd.setProperty("y", y)
 
     # Run the application
     result = app.exec_()
 
     settings = QSettings()
     settings.beginGroup("MainWindow")
-    settings.setValue("x", view.x())
-    settings.setValue("y", view.y())
-    settings.setValue("width", view.width())
-    settings.setValue("height", view.height())
+    settings.setValue("x", wnd.x())
+    settings.setValue("y", wnd.y())
+    settings.setValue("width", wnd.width())
+    settings.setValue("height", wnd.height())
     settings.endGroup()
+    settings = None
 
     repos.cleanup()
     wnd = None
+    engine = None
     repos = None
-    view = None
+    app = None
 
+    LOGGER.info("Done.")
     return result

@@ -17,14 +17,43 @@
 //
 import QtQuick 2.5
 import QtQuick.Layouts 1.2
-import QtQuick.Controls 2.1
+import QtQuick.Controls 1.4
 import QtQuick.Dialogs 1.2
 import Gitover 1.0
 
-Rectangle {
+ApplicationWindow {
     id: root
-    anchors.fill: parent
-    color:        "white"
+    width:   100
+    height:  100
+    visible: true
+
+    menuBar: MenuBar {
+        Menu {
+            title: "File"
+            MenuItem {
+                text:        "\&Open repository"
+                shortcut:    "Ctrl+O"
+                onTriggered: theAddRepoDialog.open()
+            }
+            MenuItem {
+                text:        "Quit"
+                onTriggered: Qt.quit()
+             }
+        }
+        Menu {
+            title: "Repos"
+            MenuItem {
+                text: "Update status"
+                shortcut: "Ctrl+R"
+                onTriggered: globalRepositories.triggerUpdate()
+            }
+            MenuItem {
+                text: "Fetch"
+                shortcut: "Ctrl+F"
+                onTriggered: globalRepositories.triggerFetch()
+            }
+        }
+    }
 
     FileDialog {
         id: theAddRepoDialog
@@ -42,34 +71,6 @@ Rectangle {
         anchors.fill:    parent
         anchors.margins: 2
         spacing:         2
-
-        Row {
-            Layout.fillWidth: true
-            height:           20
-            spacing:          8
-            Text {
-                visible: globalRepositories.nofRepos != 0
-                color:   "black"
-                text:    globalRepositories.nofRepos + " Repos..."
-            }
-            Text {
-                visible:         globalRepositories.nofRepos != 0
-                textFormat:      Text.RichText
-                text:            "<a href='refresh'>Refresh...</a>"
-                onLinkActivated: globalRepositories.triggerUpdate()
-            }
-            Text {
-                visible:         globalRepositories.nofRepos != 0
-                textFormat:      Text.RichText
-                text:            "<a href='fetch'>Fetch...</a>"
-                onLinkActivated: globalRepositories.triggerFetch()
-            }
-            Text {
-                textFormat:      Text.RichText
-                text:            "<a href='refresh'>Add repo...</a>"
-                onLinkActivated: theAddRepoDialog.open()
-            }
-        }
 
         GridView {
             id: theRepoGrid
