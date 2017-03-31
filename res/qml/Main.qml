@@ -33,7 +33,7 @@ ApplicationWindow {
             MenuItem {
                 text:        "\&Open repository"
                 shortcut:    "Ctrl+O"
-                onTriggered: theAddRepoDialog.open()
+                onTriggered: theAddRepoDialog.openDialog()
             }
             MenuItem {
                 text:        "Quit"
@@ -55,15 +55,12 @@ ApplicationWindow {
         }
     }
 
-    FileDialog {
+    SelectDirectoryDialog {
         id: theAddRepoDialog
-        title:          "Please choose a file"
-        folder:         shortcuts.home
-        selectFolder:   true
-        selectExisting: true
-        onAccepted: {
-            console.log("You chose: " + theAddRepoDialog.fileUrls)
-            globalRepositories.addRepoByUrl(theAddRepoDialog.fileUrls[0])
+        title: "Please choose a git directory"
+        onSelected: {
+            console.log("You choose: " + url)
+            globalRepositories.addRepoByUrl(url)
         }
     }
 
