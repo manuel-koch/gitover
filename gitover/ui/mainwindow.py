@@ -62,10 +62,16 @@ def messageHandler(msgType, context, msg):
         traceback.print_stack()
 
 
+def getResourceUrl(path):
+    base_dir = os.path.join(os.path.dirname(__file__), "..", "..")
+    if getattr(sys, 'frozen', False):
+        return QUrl("qrc:/"+path)
+    else:
+        return QUrl.fromLocalFile(os.path.join(base_dir, 'res/'+path))
+
+
 def run_gui(repo_paths):
     """Run GUI application"""
-    base_dir = os.path.join(os.path.dirname(__file__), "..", "..")
-
     LOGGER.info("Starting...")
 
     # Customize application
@@ -97,10 +103,7 @@ def run_gui(repo_paths):
     engine = QQmlApplicationEngine(app)
     engine.setOutputWarningsToStandardError(True)
     engine.rootContext().setContextProperty("globalRepositories", repos)
-    if getattr(sys, 'frozen', False):
-        engine.load(QUrl("qrc:/qml/Main.qml"))
-    else:
-        engine.load(QUrl.fromLocalFile(os.path.join(base_dir, 'res/qml/Main.qml')))
+    engine.load(getResourceUrl("qml/Main.qml"))
 
     wnd = engine.rootObjects()[0]
     wnd.title = app.applicationName()
