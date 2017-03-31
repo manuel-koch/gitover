@@ -19,14 +19,16 @@ import QtQuick 2.6
 import QtQuick.Layouts 1.2
 import QtQuick.Controls 1.4
 import Gitover 1.0
+import "."
 
 Rectangle {
     id: root
 
     height:        theColumn.implicitHeight + 2*radius
     radius:        4
-    border.width:  1
-    border.color:  "silver"
+    border.width:  internal.hasChanges || internal.canUpgrade ? 2 : 1
+    border.color:  internal.hasChanges ? Theme.colors.statusRepoModified
+                                       : ( internal.canUpgrade ? Theme.colors.statusRepoUpgradeable : Theme.colors.border )
     color:         "transparent"
     clip:          true
 
@@ -90,6 +92,34 @@ Rectangle {
         property real titleFontSize: 12
         property real labelFontSize: 10
         property real labelWidth:    50
+
+        property bool hasChanges: untracked || modified || deleted || conflicts || staged
+        property bool canUpgrade: root.repository && root.repository.trunkBranchAhead
+        property int untracked:   root.repository ? root.repository.untracked.length : 0
+        property int modified:    root.repository ? root.repository.modified.length : 0
+        property int deleted:     root.repository ? root.repository.deleted.length : 0
+        property int conflicts:   root.repository ? root.repository.conflicts.length : 0
+        property int staged:      root.repository ? root.repository.staged.length : 0
+
+
+        property string changeSummary: getChangeSummary(modified,deleted,untracked,conflicts,staged)
+
+        function getChangeSummary(m,d,u,c,s) {
+            var t = []
+            if( s )
+                t.push("<font color='#C1036E'>"+s+"-S</font>")
+            if( c )
+                t.push("<font color='#950000'>"+c+"-C</font>")
+            if( m )
+                t.push("<font color='#007272'>"+m+"-M</font>")
+            if( d )
+                t.push("<font color='#F00303'>"+d+"-D</font>")
+            if( u )
+                t.push("<font color='#F06E03'>"+u+"-U</font>")
+            if( !m && !d && !u && !c && !s)
+                t.push("<font color='#03C003'>up-to-date</font>")
+            return t.join(", ")
+        }
     }
 
     Column {
@@ -204,77 +234,10 @@ Rectangle {
                 id: theChangesText
                 font.pointSize: internal.labelFontSize
                 elide:          Text.ElideRight
-                text:           getChangesNums(modified,deleted,untracked,conflicts,staged)
+                text:           internal.changeSummary
                 wrapMode:       Text.Wrap
-                /*
-                FIXME: Popup causes problems when bundling/freezing with PyInstaller !?
-                MouseArea {
-                    id: theChangesMouseArea
-                    anchors.fill: parent
-                    onClicked: {
-                        if( theChangesText.hasChanges ) {
-                            popupText.text = theChangesText.getChanges()
-                            theChangesText.findPopupPos()
-                            popup.open()
-                        }
-                    }
-                }
 
-                function findPopupPos(item) {
-                    var rootitem = theChangesText
-                    while( rootitem.parent ) { rootitem = rootitem.parent }
-                    var pt = theChangesText.mapToItem(rootitem,popup.width,popup.height)
-                    popup.x = rootitem.width < pt.x ? rootitem.width - pt.x : 0
-                    popup.y = rootitem.height < pt.y ? rootitem.height - pt.y : 0
-                }
-
-                Popup {
-                    id: popup
-                    modal:       true
-                    focus:       true
-                    padding:     4
-                    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
-                    Text {
-                        id: popupText
-                        text: "foo"
-                        font.pointSize: internal.labelFontSize
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: popup.close()
-                            onContainsMouseChanged: {
-                                if( !containsMouse )
-                                    popup.close()
-                            }
-                        }
-                    }
-                }
-                */
-
-                property bool hasChanges: untracked || modified || deleted || conflicts || staged
-                property int untracked: root.repository ? root.repository.untracked.length : 0
-                property int modified: root.repository ? root.repository.modified.length : 0
-                property int deleted: root.repository ? root.repository.deleted.length : 0
-                property int conflicts: root.repository ? root.repository.conflicts.length : 0
-                property int staged: root.repository ? root.repository.staged.length : 0
                 property string tooltipText: ""
-
-                function getChangesNums(m,d,u,c,s) {
-                    var t = []
-                    if( s )
-                        t.push("<font color='#C1036E'>"+s+"-S</font>")
-                    if( c )
-                        t.push("<font color='#950000'>"+c+"-C</font>")
-                    if( m )
-                        t.push("<font color='#007272'>"+m+"-M</font>")
-                    if( d )
-                        t.push("<font color='#F00303'>"+d+"-D</font>")
-                    if( u )
-                        t.push("<font color='#F06E03'>"+u+"-U</font>")
-                    if( !m && !d && !u && !c && !s)
-                        t.push("<font color='#03C003'>up-to-date</font>")
-                    return t.join(", ")
-                }
 
                 function getChanges() {
                     var t = []

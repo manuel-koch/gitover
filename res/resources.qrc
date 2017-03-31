@@ -1,11 +1,13 @@
 <!DOCTYPE RCC><RCC version="1.0">
 <qresource prefix="/">
+    <file>qml/qmldir</file>
     <file>qml/Main.qml</file>
     <file>qml/BranchCombo.qml</file>
     <file>qml/LabelValueRow.qml</file>
     <file>qml/RepoDetailView.qml</file>
     <file>qml/RepoView.qml</file>
     <file>qml/SelectDirectoryDialog.qml</file>
+    <file>qml/Theme.qml</file>
     <file>icon.png</file>
     <file>fetch.png</file>
     <file>status.png</file>
