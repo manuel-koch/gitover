@@ -83,10 +83,12 @@ class RepoFsWatcher(QObject):
 
         return False
 
+    @pyqtSlot(str)
     def startTracking(self, path):
         self._repos += [git.Repo(path)]
         self._updateTracking(self._repos[-1])
 
+    @pyqtSlot(str)
     def stopTracking(self, path=None):
         if path:
             for repo in self._repos:
