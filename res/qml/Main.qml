@@ -69,6 +69,16 @@ ApplicationWindow {
         anchors.margins: 2
         spacing:         2
 
+        Text {
+            Layout.fillWidth:    true
+            Layout.fillHeight:   true
+            verticalAlignment:   Text.AlignVCenter
+            horizontalAlignment: Text.AlignHCenter
+            text:                "Display overview(s) by <a href='open'>opening</a> a git repository..."
+            onLinkActivated:     theAddRepoDialog.openDialog()
+            visible:             globalRepositories.nofRepos == 0
+        }
+
         GridView {
             id: theRepoGrid
             Layout.fillWidth:  true
@@ -78,6 +88,7 @@ ApplicationWindow {
             cellHeight:        height / Math.ceil(count/cellsPerRow)
             snapMode:          GridView.SnapToRow
             boundsBehavior:    Flickable.StopAtBounds
+            visible:           globalRepositories.nofRepos != 0
 
             property int cellSpacing: 2
             property int cellsPerRow: 5
@@ -110,9 +121,10 @@ ApplicationWindow {
 
         RepoDetailView {
             id: theRepoDetail
-            repository: null
-            Layout.fillWidth:  true
+            repository:             null
+            Layout.fillWidth:       true
             Layout.preferredHeight: root.height / 3
+            visible:                globalRepositories.nofRepos != 0
         }
     }
 }
