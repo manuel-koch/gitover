@@ -99,7 +99,10 @@ class RepoFsWatcher(QObject):
                     break
         else:
             LOGGER.debug("Stop tracking...")
-            [self.stopTracking(repo.working_dir) for repo in self._repos]
+            trackedPaths = self._fswatcher.files() + self._fswatcher.directories()
+            if trackedPaths:
+                self._fswatcher.removePaths(trackedPaths)
+            self._repos = []
             LOGGER.debug("Stopped tracking")
 
     def _stopTracking(self, repo, path):
