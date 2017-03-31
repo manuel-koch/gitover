@@ -101,21 +101,20 @@ Rectangle {
         property int conflicts:   root.repository ? root.repository.conflicts.length : 0
         property int staged:      root.repository ? root.repository.staged.length : 0
 
-
         property string changeSummary: getChangeSummary(modified,deleted,untracked,conflicts,staged)
 
         function getChangeSummary(m,d,u,c,s) {
             var t = []
             if( s )
-                t.push("<font color='#C1036E'>"+s+"-S</font>")
+                t.push("<font color='"+Theme.htmlColor(Theme.colors.statusStaged)+"'>"+s+"-S</font>")
             if( c )
-                t.push("<font color='#950000'>"+c+"-C</font>")
+                t.push("<font color='"+Theme.htmlColor(Theme.colors.statusConflict)+"'>"+c+"-C</font>")
             if( m )
-                t.push("<font color='#007272'>"+m+"-M</font>")
+                t.push("<font color='"+Theme.htmlColor(Theme.colors.statusModified)+"'>"+m+"-M</font>")
             if( d )
-                t.push("<font color='#F00303'>"+d+"-D</font>")
+                t.push("<font color='"+Theme.htmlColor(Theme.colors.statusModified)+"'>"+d+"-D</font>")
             if( u )
-                t.push("<font color='#F06E03'>"+u+"-U</font>")
+                t.push("<font color='"+Theme.htmlColor(Theme.colors.statusUntracked)+"'>"+u+"-U</font>")
             if( !m && !d && !u && !c && !s)
                 t.push("<font color='#03C003'>up-to-date</font>")
             return t.join(", ")
@@ -189,7 +188,7 @@ Rectangle {
                 Text {
                     id: theTrackingBranchDiffLabel
                     color:                  "black"
-                    text:                   "<font color='green'>"+ahead+"</font>/<font color='red'>"+behind+"</font>"
+                    text:                   "<font color='"+Theme.htmlColor(Theme.colors.branchAhead)+"'>"+ahead+"</font>/<font color='"+Theme.htmlColor(Theme.colors.branchBehind)+"'>"+behind+"</font>"
                     font.pointSize:         internal.labelFontSize
                     font.bold:              true
                     visible:                root.repository && (root.repository.trackingBranchAhead || root.repository.trackingBranchBehind)
@@ -215,7 +214,7 @@ Rectangle {
                 Text {
                     id: theTrunkBranchDiffLabel
                     color:                  "black"
-                    text:                   "<font color='green'>"+ahead+"</font>/<font color='red'>"+behind+"</font>"
+                    text:                   "<font color='"+Theme.htmlColor(Theme.colors.branchAhead)+"'>"+ahead+"</font>/<font color='"+Theme.htmlColor(Theme.colors.branchBehind)+"'>"+behind+"</font>"
                     font.pointSize:         internal.labelFontSize
                     font.bold:              true
                     visible:                root.repository && (root.repository.trunkBranchAhead || root.repository.trunkBranchBehind)
@@ -233,6 +232,7 @@ Rectangle {
             Text {
                 id: theChangesText
                 font.pointSize: internal.labelFontSize
+                font.bold:      internal.hasChanges
                 elide:          Text.ElideRight
                 text:           internal.changeSummary
                 wrapMode:       Text.Wrap

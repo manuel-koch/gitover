@@ -28,5 +28,24 @@ Item {
         property color border:                "silver"
         property color statusRepoUpgradeable: "green"
         property color statusRepoModified:    "yellow"
+        property color statusStaged:          "#C1036E"
+        property color statusConflict:        "#950000"
+        property color statusModified:        "#007272"
+        property color statusDeleted:         "#F00303"
+        property color statusUntracked:       "#F06E03"
+        property color branchAhead:           "green"
+        property color branchBehind:          "red"
+    }
+
+    function colorValToHex(v) {
+        v *= 255
+        if( v < 16 )
+            return "0" + v.toString(16)
+        else
+            return "" + v.toString(16)
+    }
+
+    function htmlColor(c) {
+        return "#" + colorValToHex(c.r) + colorValToHex(c.g) + colorValToHex(c.b)
     }
 }
