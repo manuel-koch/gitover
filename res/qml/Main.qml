@@ -93,6 +93,7 @@ ApplicationWindow {
 
             property int cellSpacing: 2
             property int cellsPerRow: 5
+            property Repo repository: null
 
             model: globalRepositories
 
@@ -112,12 +113,10 @@ ApplicationWindow {
             onCurrentIndexChanged: {
                 console.debug("currentIndex",currentIndex)
                 if( currentIndex != -1 ) {
-                    theRepoDetail.repository = globalRepositories.repo( currentIndex )
-                    theRepoChanges.repository = globalRepositories.repo( currentIndex )
+                    theRepoGrid.repository = globalRepositories.repo( currentIndex )
                 }
                 else {
-                    theRepoDetail.repository = null
-                    theRepoChanges.repository = null
+                    theRepoGrid.repository = null
                 }
             }
 
@@ -134,7 +133,7 @@ ApplicationWindow {
                 id: theRepoDetail
                 Layout.fillWidth:  true
                 Layout.fillHeight: true
-                repository:        null
+                repository:        theRepoGrid.repository
                 visible:           globalRepositories.nofRepos != 0
             }
 
@@ -142,7 +141,15 @@ ApplicationWindow {
                 id: theRepoChanges
                 Layout.fillWidth:  true
                 Layout.fillHeight: true
-                repository:        null
+                repository:        theRepoGrid.repository
+                visible:           globalRepositories.nofRepos != 0
+            }
+
+            RepoOutputList {
+                id: theRepoOutput
+                Layout.fillWidth:  true
+                Layout.fillHeight: true
+                repository:        theRepoGrid.repository
                 visible:           globalRepositories.nofRepos != 0
             }
         }

@@ -21,6 +21,7 @@ Copyright 2017 Manuel Koch
 
 Data model for all repositiories.
 """
+import datetime
 import logging
 import os
 import random
@@ -29,7 +30,10 @@ import threading
 import time
 from typing import NamedTuple
 
+
 import git
+from git.cmd import handle_process_output
+from git.util import finalize_process
 
 from PyQt5.QtCore import QModelIndex, pyqtSlot
 from PyQt5.QtCore import QVariant
@@ -312,6 +316,9 @@ class GitFetchWorker(QObject):
     # signal gets emitted when starting/stopping fetch action
     fetchprogress = pyqtSignal(bool)
 
+    # signal gets emitted for every generated output line during fetch
+    output = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
         self.fetch.connect(self._onFetch)
@@ -340,17 +347,24 @@ class GitFetchWorker(QObject):
                 # prevent multiple fetch starting instantly
                 time.sleep(1 + 1.0 / random.randint(1, 10))
             repo = git.Repo(path)
-            repo.git.fetch(prune=True)
+            proc = repo.git.fetch("origin", prune=True,
+                                  verbose=True, with_extended_output=True, as_process=True)
+            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
         except:
             LOGGER.exception("Failed to fetch git repo at {}".format(path))
         self._releaseFetchSlot()
         self.fetchprogress.emit(False)
 
+    def _onOutput(self, line):
+        line = line.rstrip()
+        LOGGER.debug(line)
+        self.output.emit(line)
+
 
 ChangedPath = NamedTuple("ChangedPath", [("path", str), ("status", str)])
 
 
-class ChangedFilesModel(QAbstractItemModel, QmlTypeMixin):
+class ChangedFilesModel(QAbstractItemModel):
     """Model of changed files of a repository arranged in rows"""
 
     STATUS_REPO = Qt.UserRole + 1
@@ -403,6 +417,63 @@ class ChangedFilesModel(QAbstractItemModel, QmlTypeMixin):
         self.endResetModel()
 
 
+OutputLine = NamedTuple("OutputLine", [("timestamp", str), ("line", str)])
+
+
+class OutputModel(QAbstractItemModel):
+    """Model of output lines"""
+
+    TIMESTAMP = Qt.UserRole + 1
+    LINE = Qt.UserRole + 2
+
+    def __init__(self, parent=None):
+        """Construct changed files model"""
+        super().__init__(parent)
+        self._entries = []
+
+    def roleNames(self):
+        roles = super().roleNames()
+        roles[OutputModel.TIMESTAMP] = b"timestamp"
+        roles[OutputModel.LINE] = b"line"
+        return roles
+
+    def index(self, row, col, parent=None):
+        return self.createIndex(row, col)
+
+    def rowCount(self, parent=None):
+        return len(self._entries)
+
+    def columnCount(self, idx):
+        return 1
+
+    def data(self, idx, role=Qt.DisplayRole):
+        if not idx.isValid() or idx.row() >= len(self._entries):
+            return None
+
+        entry = self._entries[idx.row()]
+        if role == Qt.DisplayRole:
+            return entry.line
+        if role == OutputModel.TIMESTAMP:
+            return entry.timestamp
+        if role == OutputModel.LINE:
+            return entry.line
+
+        return None
+
+    @pyqtSlot(str)
+    def appendOutput(self, line):
+        self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
+        now = datetime.datetime.now().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
+        self._entries.append(OutputLine(now, line))
+        self.endInsertRows()
+
+    @pyqtSlot()
+    def clearOutput(self):
+        self.beginResetModel()
+        self._entries = []
+        self.endResetModel()
+
+
 class Repo(QObject, QmlTypeMixin):
     """Contains repository information"""
 
@@ -432,6 +503,9 @@ class Repo(QObject, QmlTypeMixin):
         self._path = os.path.normpath(os.path.abspath(path))
         self._name = name or os.path.basename(self._path)
 
+        self._changes = ChangedFilesModel(self)
+        self._output = OutputModel(self)
+
         self._workerThread = QThread(self, objectName="workerThread-{}".format(name))
         self._workerThread.start()
 
@@ -443,6 +517,7 @@ class Repo(QObject, QmlTypeMixin):
         self._fetchWorker = GitFetchWorker()
         self._fetchWorker.moveToThread(self._workerThread)
         self._fetchWorker.fetchprogress.connect(self._setFetching)
+        self._fetchWorker.output.connect(self._output.appendOutput)
 
         self._branch = ""
         self._branches = []
@@ -458,8 +533,6 @@ class Repo(QObject, QmlTypeMixin):
         self._conflicts = 0
         self._staged = 0
 
-        self._changes = ChangedFilesModel(self)
-
         self._updating = False
         self._updateTriggered = False
 
@@ -474,6 +547,10 @@ class Repo(QObject, QmlTypeMixin):
     @pyqtProperty(QObject, constant=True)
     def changes(self):
         return self._changes
+
+    @pyqtProperty(QObject, constant=True)
+    def output(self):
+        return self._output
 
     @pyqtSlot()
     def stopWorker(self):
