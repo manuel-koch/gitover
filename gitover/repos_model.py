@@ -230,7 +230,7 @@ class GitStatus(object):
                              .format(self.path))
 
         try:
-            self.trunkBranch = repo.git.config("custom.devbranch", with_exceptions=False)
+            self.trunkBranch = repo.git.config("gitover.trunkbranch", with_exceptions=False)
             if not self.trunkBranch:
                 self.trunkBranch = "origin/develop"
             if self.trunkBranch in repo.refs:
