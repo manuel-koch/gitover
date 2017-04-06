@@ -128,6 +128,7 @@ ApplicationWindow {
             Layout.fillWidth:       true
             Layout.fillHeight:      false
             Layout.preferredHeight: root.height / 3
+            visible:                globalRepositories.nofRepos != 0
 
             RepoDetailView {
                 id: theRepoDetail
