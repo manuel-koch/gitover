@@ -13,5 +13,6 @@
     <file>icon.png</file>
     <file>fetch.png</file>
     <file>status.png</file>
+    <file>sync.png</file>
 </qresource>
 </RCC>

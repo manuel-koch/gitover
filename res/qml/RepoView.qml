@@ -158,6 +158,14 @@ Rectangle {
                 source:                 "../fetch.png"
                 visible:                root.repository && root.repository.fetching
             }
+            Image {
+                id: thePullIcon
+                Layout.preferredWidth:  theNameLabel.height
+                Layout.preferredHeight: theNameLabel.height
+                fillMode:               Image.Stretch
+                source:                 "../sync.png"
+                visible:                root.repository && root.repository.pulling
+            }
         }
         LabelValueRow {
             id: theBranchRow

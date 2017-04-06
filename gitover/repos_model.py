@@ -25,11 +25,11 @@ import datetime
 import logging
 import os
 import random
+import string
 import subprocess
 import threading
 import time
 from typing import NamedTuple
-
 
 import git
 from git.cmd import handle_process_output
@@ -361,6 +361,58 @@ class GitFetchWorker(QObject):
         self.output.emit(line)
 
 
+class GitPullWorker(QObject):
+    """Host git pull action within worker thread"""
+
+    # signal gets emitted to trigger pulling given repo root path
+    pull = pyqtSignal(str)
+
+    # signal gets emitted when starting/stopping pull action
+    pullprogress = pyqtSignal(bool)
+
+    # signal gets emitted for every generated output line during pull
+    output = pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.pull.connect(self._onPull)
+
+    @pyqtSlot(str)
+    def _onPull(self, path):
+        """Pull selected repo"""
+        self.pullprogress.emit(True)
+        try:
+            repo = git.Repo(path)
+
+            stash_name = "Automatic stash before pull: {}".format(
+                "".join(random.sample(string.ascii_letters + string.digits, 32)))
+            dirty = repo.is_dirty()
+            if dirty:
+                proc = repo.git.stash("save", stash_name,
+                                      with_extended_output=True, as_process=True)
+                handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+
+            proc = repo.git.pull(prune=True,
+                                 verbose=True, with_extended_output=True, as_process=True)
+            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+
+            stashed = repo.git.stash("list").split("\n")
+            stashed = stash_name in stashed[0] if stashed else False
+            if stashed:
+                proc = repo.git.stash("pop",
+                                      with_extended_output=True, as_process=True)
+                handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+
+        except:
+            LOGGER.exception("Failed to pull git repo at {}".format(path))
+        self.pullprogress.emit(False)
+
+    def _onOutput(self, line):
+        line = line.rstrip()
+        LOGGER.debug(line)
+        self.output.emit(line)
+
+
 ChangedPath = NamedTuple("ChangedPath", [("path", str), ("status", str)])
 
 
@@ -495,6 +547,7 @@ class Repo(QObject, QmlTypeMixin):
 
     updatingChanged = pyqtSignal(bool)
     fetchingChanged = pyqtSignal(bool)
+    pullingChanged = pyqtSignal(bool)
 
     def __init__(self, path, name="", parent=None):
         super().__init__(parent)
@@ -519,6 +572,11 @@ class Repo(QObject, QmlTypeMixin):
         self._fetchWorker.fetchprogress.connect(self._setFetching)
         self._fetchWorker.output.connect(self._output.appendOutput)
 
+        self._pullWorker = GitPullWorker()
+        self._pullWorker.moveToThread(self._workerThread)
+        self._pullWorker.pullprogress.connect(self._setPulling)
+        self._pullWorker.output.connect(self._output.appendOutput)
+
         self._branch = ""
         self._branches = []
         self._tracking_branch = ""
@@ -538,6 +596,9 @@ class Repo(QObject, QmlTypeMixin):
 
         self._fetching = False
         self._fetchTriggered = False
+
+        self._pulling = False
+        self._pullTriggered = False
 
         self.triggerUpdate()
 
@@ -599,6 +660,26 @@ class Repo(QObject, QmlTypeMixin):
         self._fetchWorker.fetch.emit(self._path)
         self._fetchTriggered = True
 
+    @pyqtProperty(bool, notify=pullingChanged)
+    def pulling(self):
+        return self._pulling
+
+    def _setPulling(self, pulling):
+        if self._pulling != pulling:
+            self._pulling = pulling
+            self.pullingChanged.emit(self._pulling)
+        if not pulling:
+            self._pullTriggered = False
+            self.triggerUpdate()
+
+    @pyqtSlot()
+    def triggerPull(self):
+        if self._pullTriggered:
+            LOGGER.debug("Pull already triggered...")
+            return
+        self._pullWorker.pull.emit(self._path)
+        self._pullTriggered = True
+
     @pyqtSlot(object)
     def _onStatusUpdated(self, status):
         def sorteditems(it):
@@ -642,6 +723,9 @@ class Repo(QObject, QmlTypeMixin):
         if name == "fetch":
             self.triggerFetch()
             return
+        if name == "pull":
+            self.triggerPull()
+            return
 
         tool = cfg.tool(name)
         if not tool:
@@ -665,6 +749,7 @@ class Repo(QObject, QmlTypeMixin):
         cfg = self._config()
         tools = [{"name": "update", "title": "Refresh"},
                  {"name": "fetch", "title": "Fetch"},
+                 {"name": "pull", "title": "Pull"},
                  {"title": ""}]
         tools += cfg.tools()
         return QVariant(tools)

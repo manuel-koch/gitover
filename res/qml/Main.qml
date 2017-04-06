@@ -65,6 +65,11 @@ ApplicationWindow {
         }
     }
 
+    QtObject {
+        id: internal
+        property bool hasRepos: globalRepositories.nofRepos != 0
+    }
+
     ColumnLayout {
         anchors.fill:    parent
         anchors.margins: 2
@@ -77,7 +82,7 @@ ApplicationWindow {
             horizontalAlignment: Text.AlignHCenter
             text:                "Display overview(s) by <a href='open'>opening</a> a git repository..."
             onLinkActivated:     theAddRepoDialog.openDialog()
-            visible:             globalRepositories.nofRepos == 0
+            visible:             !internal.hasRepos
         }
 
         GridView {
@@ -89,7 +94,7 @@ ApplicationWindow {
             cellHeight:        height / Math.ceil(count/cellsPerRow)
             snapMode:          GridView.SnapToRow
             boundsBehavior:    Flickable.StopAtBounds
-            visible:           globalRepositories.nofRepos != 0
+            visible:           internal.hasRepos
 
             property int cellSpacing: 2
             property int cellsPerRow: 5
@@ -112,45 +117,41 @@ ApplicationWindow {
 
             onCurrentIndexChanged: {
                 console.debug("currentIndex",currentIndex)
-                if( currentIndex != -1 ) {
-                    theRepoGrid.repository = globalRepositories.repo( currentIndex )
-                }
-                else {
-                    theRepoGrid.repository = null
-                }
+                theRepoGrid.repository = (currentIndex != -1) ? globalRepositories.repo( currentIndex ) : null
             }
 
             onCountChanged: currentIndex = -1
         }
 
-        RowLayout {
+        TabView {
+            id: theTabView
             Layout.fillWidth:       true
             Layout.fillHeight:      false
             Layout.preferredHeight: root.height / 3
-            visible:                globalRepositories.nofRepos != 0
-
-            RepoDetailView {
-                id: theRepoDetail
-                Layout.fillWidth:  true
-                Layout.fillHeight: true
-                repository:        theRepoGrid.repository
-                visible:           globalRepositories.nofRepos != 0
+            visible:                internal.hasRepos
+            Tab {
+                title: "General"
+                RepoDetailView {
+                    id: theRepoDetail
+                    repository: theRepoGrid.repository
+                    visible:    internal.hasRepos
+                }
             }
-
-            RepoStatusList {
-                id: theRepoChanges
-                Layout.fillWidth:  true
-                Layout.fillHeight: true
-                repository:        theRepoGrid.repository
-                visible:           globalRepositories.nofRepos != 0
+            Tab {
+                title: "Status"
+                RepoStatusList {
+                    id: theRepoChanges
+                    repository: theRepoGrid.repository
+                    visible:    internal.hasRepos
+                }
             }
-
-            RepoOutputList {
-                id: theRepoOutput
-                Layout.fillWidth:  true
-                Layout.fillHeight: true
-                repository:        theRepoGrid.repository
-                visible:           globalRepositories.nofRepos != 0
+            Tab {
+                title: "Output"
+                RepoOutputList {
+                    id: theRepoOutput
+                    repository: theRepoGrid.repository
+                    visible:    internal.hasRepos
+                }
             }
         }
     }
