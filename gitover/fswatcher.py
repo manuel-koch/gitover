@@ -159,7 +159,10 @@ class RepoFsWatcher(QObject):
     def _compareDirSnapshots(self, path):
         if not path in self._dirSnapshots:
             self._dirSnapshots[path] = set()
-        paths = set([os.path.join(path, p) for p in os.listdir(path)])
+        if os.path.isdir(path):
+            paths = set([os.path.join(path, p) for p in os.listdir(path)])
+        else:
+            paths = set()
         diff = bool(paths.difference(self._dirSnapshots[path]))
         self._dirSnapshots[path] = paths
         return diff
