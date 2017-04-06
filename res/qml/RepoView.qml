@@ -95,11 +95,11 @@ Rectangle {
 
         property bool hasChanges: untracked || modified || deleted || conflicts || staged
         property bool canUpgrade: root.repository && root.repository.trunkBranchAhead
-        property int untracked:   root.repository ? root.repository.untracked.length : 0
-        property int modified:    root.repository ? root.repository.modified.length : 0
-        property int deleted:     root.repository ? root.repository.deleted.length : 0
-        property int conflicts:   root.repository ? root.repository.conflicts.length : 0
-        property int staged:      root.repository ? root.repository.staged.length : 0
+        property int untracked:   root.repository ? root.repository.untracked : 0
+        property int modified:    root.repository ? root.repository.modified : 0
+        property int deleted:     root.repository ? root.repository.deleted : 0
+        property int conflicts:   root.repository ? root.repository.conflicts : 0
+        property int staged:      root.repository ? root.repository.staged : 0
 
         property string changeSummary: getChangeSummary(modified,deleted,untracked,conflicts,staged)
 
@@ -236,26 +236,6 @@ Rectangle {
                 elide:          Text.ElideRight
                 text:           internal.changeSummary
                 wrapMode:       Text.Wrap
-
-                property string tooltipText: ""
-
-                function getChanges() {
-                    var t = []
-                    appendToArray(t,root.repository.staged,"staged")
-                    appendToArray(t,root.repository.conflicts,"conflicts")
-                    appendToArray(t,root.repository.modified,"modified")
-                    appendToArray(t,root.repository.deleted,"deleted")
-                    appendToArray(t,root.repository.untracked,"untracked")
-                    return t.join("<br>")
-                }
-
-                function appendToArray(target,source,title) {
-                    if( source.length ){
-                        target.push("<b>"+title+":</b>")
-                        for(var i=0;i<source.length;i++)
-                            t.push("&nbsp;&nbsp;"+source[i])
-                    }
-                }
             }
         }
     }

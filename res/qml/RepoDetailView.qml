@@ -54,78 +54,13 @@ Rectangle {
             }
             Text {
                 Layout.fillWidth: true
-                text:             nofStaged + " staged files:"
+                text:             "Branches :"
                 font.bold:        true
-                visible:          nofStaged
-                property int nofStaged: repository != null ? repository.staged.length : 0
+                visible:          root.repository !== null
             }
             Repeater {
                 Layout.fillWidth: true
-                model:            repository != null ? repository.staged : null
-                Text {
-                    text:           modelData
-                    leftPadding:    10
-                    font.pointSize: 10
-                }
-            }
-            Text {
-                Layout.fillWidth: true
-                text:             nofConflicts + " conflicting files:"
-                font.bold:        true
-                visible:          nofConflicts
-                property int nofConflicts: repository != null ? repository.conflicts.length : 0
-            }
-            Repeater {
-                Layout.fillWidth: true
-                model:            repository != null ? repository.conflicts : null
-                Text {
-                    text:           modelData
-                    leftPadding:    10
-                    font.pointSize: 10
-                }
-            }
-            Text {
-                Layout.fillWidth: true
-                text:             nofModified + " modified files:"
-                font.bold:        true
-                visible:          nofModified
-                property int nofModified: repository != null ? repository.modified.length : 0
-            }
-            Repeater {
-                Layout.fillWidth:  true
-                model:             repository != null ? repository.modified : null
-                Text {
-                    text:           modelData
-                    leftPadding:    10
-                    font.pointSize: 10
-                }
-            }
-            Text {
-                Layout.fillWidth: true
-                text:             nofDeleted + " deleted files:"
-                font.bold:        true
-                visible:          nofDeleted
-                property int nofDeleted: repository != null ? repository.deleted.length : 0
-            }
-            Repeater {
-                Layout.fillWidth: true
-                model:            repository != null ? repository.deleted : null
-                Text {
-                    text:           modelData
-                    leftPadding:    10
-                    font.pointSize: 10
-                }
-            }
-            Text {
-                Layout.fillWidth: true
-                text:             nofUntracked + " untracked files:"
-                font.bold:        true
-                visible:          nofUntracked
-                property int nofUntracked: repository != null ? repository.untracked.length : 0
-            }
-            Repeater {
-                Layout.fillWidth: true
-                model:            repository != null ? repository.untracked : null
+                model:            repository != null ? repository.branches : null
                 Text {
                     text:           modelData
                     leftPadding:    10

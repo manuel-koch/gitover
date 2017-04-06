@@ -20,6 +20,7 @@ import QtQuick.Layouts 1.2
 import QtQuick.Controls 1.4
 import QtQuick.Dialogs 1.2
 import Gitover 1.0
+import "."
 
 ApplicationWindow {
     id: root
@@ -100,7 +101,7 @@ ApplicationWindow {
                 width:      theRepoGrid.cellWidth - ( isLastColumn ? 0 : theRepoGrid.cellSpacing)
                 height:     theRepoGrid.cellHeight - ( isLastRow ? 0 : theRepoGrid.cellSpacing)
                 onClicked:  theRepoGrid.currentIndex = index
-                color:      isCurrent ? "#fffeee" : "transparent"
+                color:      isCurrent ? Theme.colors.selectedRepoBg : "transparent"
                 property bool isCurrent:    theRepoGrid.currentIndex == index
                 property int  column:       index % theRepoGrid.cellsPerRow
                 property int  row:          Math.floor( index / theRepoGrid.cellsPerRow )
@@ -110,21 +111,39 @@ ApplicationWindow {
 
             onCurrentIndexChanged: {
                 console.debug("currentIndex",currentIndex)
-                if( currentIndex != -1 )
+                if( currentIndex != -1 ) {
                     theRepoDetail.repository = globalRepositories.repo( currentIndex )
-                else
+                    theRepoChanges.repository = globalRepositories.repo( currentIndex )
+                }
+                else {
                     theRepoDetail.repository = null
+                    theRepoChanges.repository = null
+                }
             }
 
             onCountChanged: currentIndex = -1
         }
 
-        RepoDetailView {
-            id: theRepoDetail
-            repository:             null
+        RowLayout {
             Layout.fillWidth:       true
+            Layout.fillHeight:      false
             Layout.preferredHeight: root.height / 3
-            visible:                globalRepositories.nofRepos != 0
+
+            RepoDetailView {
+                id: theRepoDetail
+                Layout.fillWidth:  true
+                Layout.fillHeight: true
+                repository:        null
+                visible:           globalRepositories.nofRepos != 0
+            }
+
+            RepoStatusList {
+                id: theRepoChanges
+                Layout.fillWidth:  true
+                Layout.fillHeight: true
+                repository:        null
+                visible:           globalRepositories.nofRepos != 0
+            }
         }
     }
 }

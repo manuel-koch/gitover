@@ -26,6 +26,7 @@ Item {
     QtObject {
         id: theColors
         property color border:                "silver"
+        property color selectedRepoBg:        "#FFFFC6"
         property color statusRepoUpgradeable: "green"
         property color statusRepoModified:    "yellow"
         property color statusStaged:          "#C1036E"
@@ -33,6 +34,8 @@ Item {
         property color statusModified:        "#007272"
         property color statusDeleted:         "#F00303"
         property color statusUntracked:       "#F06E03"
+        property color statusHeaderBg:        "#ECECEC"
+        property color statusSectionBg:       "#ACDBDD"
         property color branchAhead:           "green"
         property color branchBehind:          "red"
     }

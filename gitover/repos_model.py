@@ -27,6 +27,7 @@ import random
 import subprocess
 import threading
 import time
+from typing import NamedTuple
 
 import git
 
@@ -201,7 +202,8 @@ class GitStatus(object):
             self.branch = repo.active_branch.name
         except TypeError:
             if repo.head and repo.head.commit:
-                self.branch = "detached {}".format(repo.git.rev_parse(repo.head.commit.hexsha, short=8))
+                head = repo.git.rev_parse(repo.head.commit.hexsha, short=8)
+                self.branch = "detached {}".format(head)
             else:
                 self.branch = ""
 
@@ -256,9 +258,9 @@ class GitStatus(object):
             pass  # unmerged_blobs() seems to raise an exception when there are no conflicts !?
 
         try:
-            for p in [p for p in repo.git.diff("HEAD", name_only=True).split("\n") if p.strip()]:
-                if p not in self.modified and p not in self.deleted:
-                    self.staged.add(p)
+            staged = repo.git.diff("HEAD", name_only=True, cached=True).split("\n")
+            for p in [p for p in staged if p.strip()]:
+                self.staged.add(p)
         except:
             pass
 
@@ -345,6 +347,62 @@ class GitFetchWorker(QObject):
         self.fetchprogress.emit(False)
 
 
+ChangedPath = NamedTuple("ChangedPath", [("path", str), ("status", str)])
+
+
+class ChangedFilesModel(QAbstractItemModel, QmlTypeMixin):
+    """Model of changed files of a repository arranged in rows"""
+
+    STATUS_REPO = Qt.UserRole + 1
+    PATH_REPO = Qt.UserRole + 2
+
+    def __init__(self, parent=None):
+        """Construct changed files model"""
+        super().__init__(parent)
+        self._entries = []
+
+    def roleNames(self):
+        roles = super().roleNames()
+        roles[ChangedFilesModel.STATUS_REPO] = b"status"
+        roles[ChangedFilesModel.PATH_REPO] = b"path"
+        return roles
+
+    def index(self, row, col, parent=None):
+        return self.createIndex(row, col)
+
+    def rowCount(self, parent=None):
+        return len(self._entries)
+
+    def columnCount(self, idx):
+        return 1
+
+    def data(self, idx, role=Qt.DisplayRole):
+        if not idx.isValid() or idx.row() >= len(self._entries):
+            return None
+
+        entry = self._entries[idx.row()]
+        if role == Qt.DisplayRole:
+            return entry.path
+        if role == ChangedFilesModel.PATH_REPO:
+            return entry.path
+        if role == ChangedFilesModel.STATUS_REPO:
+            return entry.status
+
+        return None
+
+    def setChanges(self, modified=None, staged=None, deleted=None, conflicting=None,
+                   untracked=None):
+        self.beginResetModel()
+        entries = []
+        entries += [ChangedPath(p, "modified") for p in modified] if modified else []
+        entries += [ChangedPath(p, "staged") for p in staged] if staged else []
+        entries += [ChangedPath(p, "deleted") for p in deleted] if deleted else []
+        entries += [ChangedPath(p, "conflict") for p in conflicting] if conflicting else []
+        entries += [ChangedPath(p, "untracked") for p in untracked] if untracked else []
+        self._entries = entries
+        self.endResetModel()
+
+
 class Repo(QObject, QmlTypeMixin):
     """Contains repository information"""
 
@@ -358,11 +416,11 @@ class Repo(QObject, QmlTypeMixin):
     trunkBranchChanged = pyqtSignal(str)
     trunkBranchAheadChanged = pyqtSignal(int)
     trunkBranchBehindChanged = pyqtSignal(int)
-    untrackedChanged = pyqtSignal("QStringList")
-    modifiedChanged = pyqtSignal("QStringList")
-    deletedChanged = pyqtSignal("QStringList")
-    conflictsChanged = pyqtSignal("QStringList")
-    stagedChanged = pyqtSignal("QStringList")
+    untrackedChanged = pyqtSignal(int)
+    modifiedChanged = pyqtSignal(int)
+    deletedChanged = pyqtSignal(int)
+    conflictsChanged = pyqtSignal(int)
+    stagedChanged = pyqtSignal(int)
 
     updatingChanged = pyqtSignal(bool)
     fetchingChanged = pyqtSignal(bool)
@@ -394,11 +452,13 @@ class Repo(QObject, QmlTypeMixin):
         self._trunk_branch = ""
         self._trunk_branch_ahead = 0
         self._trunk_branch_behind = 0
-        self._untracked = []
-        self._modified = []
-        self._deleted = []
-        self._conflicts = []
-        self._staged = []
+        self._untracked = 0
+        self._modified = 0
+        self._deleted = 0
+        self._conflicts = 0
+        self._staged = 0
+
+        self._changes = ChangedFilesModel(self)
 
         self._updating = False
         self._updateTriggered = False
@@ -410,6 +470,10 @@ class Repo(QObject, QmlTypeMixin):
 
     def __str__(self):
         return self._path
+
+    @pyqtProperty(QObject, constant=True)
+    def changes(self):
+        return self._changes
 
     @pyqtSlot()
     def stopWorker(self):
@@ -464,6 +528,7 @@ class Repo(QObject, QmlTypeMixin):
             l = list(it)
             l.sort(key=str.lower)
             return l
+
         self.branch = status.branch
         self.branches = sorteditems(status.branches)
         self.trackingBranch = status.trackingBranch
@@ -472,11 +537,17 @@ class Repo(QObject, QmlTypeMixin):
         self.trunkBranch = status.trunkBranch
         self.trunkBranchAhead = status.trunkBranchAhead
         self.trunkBranchBehind = status.trunkBranchBehind
-        self.untracked = sorteditems(status.untracked)
-        self.modified = sorteditems(status.modified)
-        self.deleted = sorteditems(status.deleted)
-        self.conflicts = sorteditems(status.conflicts)
-        self.staged = sorteditems(status.staged)
+        self.untracked = len(status.untracked)
+        self.modified = len(status.modified)
+        self.deleted = len(status.deleted)
+        self.conflicts = len(status.conflicts)
+        self.staged = len(status.staged)
+
+        self._changes.setChanges(modified=sorteditems(status.modified),
+                                 staged=sorteditems(status.staged),
+                                 deleted=sorteditems(status.deleted),
+                                 conflicting=sorteditems(status.conflicts),
+                                 untracked=sorteditems(status.untracked))
 
     def _config(self):
         cfg = Config()
@@ -621,7 +692,7 @@ class Repo(QObject, QmlTypeMixin):
             self._branches = branches
             self.branchesChanged.emit(self._branches)
 
-    @pyqtProperty("QStringList", notify=untrackedChanged)
+    @pyqtProperty(int, notify=untrackedChanged)
     def untracked(self):
         return self._untracked
 
@@ -631,7 +702,7 @@ class Repo(QObject, QmlTypeMixin):
             self._untracked = untracked
             self.untrackedChanged.emit(self._untracked)
 
-    @pyqtProperty("QStringList", notify=modifiedChanged)
+    @pyqtProperty(int, notify=modifiedChanged)
     def modified(self):
         return self._modified
 
@@ -641,7 +712,7 @@ class Repo(QObject, QmlTypeMixin):
             self._modified = modified
             self.modifiedChanged.emit(self._modified)
 
-    @pyqtProperty("QStringList", notify=deletedChanged)
+    @pyqtProperty(int, notify=deletedChanged)
     def deleted(self):
         return self._deleted
 
@@ -651,7 +722,7 @@ class Repo(QObject, QmlTypeMixin):
             self._deleted = deleted
             self.deletedChanged.emit(self._deleted)
 
-    @pyqtProperty("QStringList", notify=conflictsChanged)
+    @pyqtProperty(int, notify=conflictsChanged)
     def conflicts(self):
         return self._conflicts
 
@@ -661,7 +732,7 @@ class Repo(QObject, QmlTypeMixin):
             self._conflicts = conflicts
             self.conflictsChanged.emit(self._conflicts)
 
-    @pyqtProperty("QStringList", notify=stagedChanged)
+    @pyqtProperty(int, notify=stagedChanged)
     def staged(self):
         return self._staged
 
