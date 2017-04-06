@@ -40,7 +40,7 @@ Rectangle {
         snapMode:                 ListView.SnapToItem
         boundsBehavior:           Flickable.StopAtBounds
 
-        model: repository ? repository.changes : null
+        model: repository !== null ? repository.changes : null
 
         headerPositioning: ListView.OverlayHeader
         header: Rectangle {
@@ -49,6 +49,7 @@ Rectangle {
             width:  theList.width
             height: theHeaderText.height
             color:  Theme.colors.statusHeaderBg
+            visible: repository !== null
             Text {
                 id: theHeaderText
                 width:       theList.width
