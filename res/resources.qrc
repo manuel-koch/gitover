@@ -2,6 +2,7 @@
 <qresource prefix="/">
     <file>qml/qmldir</file>
     <file>qml/Main.qml</file>
+    <file>qml/AboutDialog.qml</file>
     <file>qml/BranchCombo.qml</file>
     <file>qml/LabelValueRow.qml</file>
     <file>qml/RepoOutputList.qml</file>

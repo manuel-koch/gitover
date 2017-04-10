@@ -37,9 +37,13 @@ ApplicationWindow {
                 onTriggered: theAddRepoDialog.openDialog()
             }
             MenuItem {
+                text:        "About Gitover"
+                onTriggered: theAboutDialog.openDialog()
+            }
+            MenuItem {
                 text:        "Quit"
                 onTriggered: Qt.quit()
-             }
+            }
         }
         Menu {
             title: "Repos"
@@ -63,6 +67,10 @@ ApplicationWindow {
             console.log("You choose: " + url)
             globalRepositories.addRepoByUrl(url)
         }
+    }
+
+    AboutDialog {
+        id: theAboutDialog
     }
 
     QtObject {

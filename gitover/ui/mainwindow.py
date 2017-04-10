@@ -102,6 +102,7 @@ def run_gui(repo_paths):
 
     engine = QQmlApplicationEngine(app)
     engine.setOutputWarningsToStandardError(True)
+    engine.rootContext().setContextProperty("globalVersion", __version__)
     engine.rootContext().setContextProperty("globalRepositories", repos)
     engine.load(getResourceUrl("qml/Main.qml"))
 
