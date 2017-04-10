@@ -11,6 +11,7 @@
     <file>qml/SelectDirectoryDialog.qml</file>
     <file>qml/Theme.qml</file>
     <file>icon.png</file>
+    <file>checkout.png</file>
     <file>fetch.png</file>
     <file>status.png</file>
     <file>sync.png</file>

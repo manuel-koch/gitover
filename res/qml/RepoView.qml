@@ -166,6 +166,14 @@ Rectangle {
                 source:                 "../sync.png"
                 visible:                root.repository && root.repository.pulling
             }
+            Image {
+                id: theCheckoutIcon
+                Layout.preferredWidth:  theNameLabel.height
+                Layout.preferredHeight: theNameLabel.height
+                fillMode:               Image.Stretch
+                source:                 "../checkout.png"
+                visible:                root.repository && root.repository.checkingout
+            }
         }
         LabelValueRow {
             id: theBranchRow

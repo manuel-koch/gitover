@@ -413,6 +413,63 @@ class GitPullWorker(QObject):
         self.output.emit(line)
 
 
+class GitCheckoutWorker(QObject):
+    """Host git checkout action within worker thread"""
+
+    # signal gets emitted to trigger checkout given repo branch
+    checkoutBranch = pyqtSignal(str)
+
+    # signal gets emitted when starting/stopping pull action
+    checkoutprogress = pyqtSignal(bool)
+
+    # signal gets emitted for every generated output line during checkout
+    output = pyqtSignal(str)
+
+    def __init__(self, path):
+        super().__init__()
+        self._path = path
+        self.checkoutBranch.connect(self._onCheckoutBranch)
+
+    @pyqtSlot(str)
+    def _onCheckoutBranch(self, branch):
+        """Checkout selected branch"""
+        try:
+            self.checkoutprogress.emit(True)
+            repo = git.Repo(self._path)
+
+            if branch not in repo.branches:
+                return
+
+            stash_name = "Automatic stash before checkout: {}".format(
+                "".join(random.sample(string.ascii_letters + string.digits, 32)))
+            dirty = repo.is_dirty()
+            if dirty:
+                proc = repo.git.stash("save", stash_name,
+                                      with_extended_output=True, as_process=True)
+                handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+
+            proc = repo.git.checkout(branch,
+                                     with_extended_output=True, as_process=True)
+            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+
+            stashed = repo.git.stash("list").split("\n")
+            stashed = stash_name in stashed[0] if stashed else False
+            if stashed:
+                proc = repo.git.stash("pop",
+                                      with_extended_output=True, as_process=True)
+                handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+
+        except:
+            LOGGER.exception("Failed to pull git repo at {}".format(path))
+        finally:
+            self.checkoutprogress.emit(False)
+
+    def _onOutput(self, line):
+        line = line.rstrip()
+        LOGGER.debug(line)
+        self.output.emit(line)
+
+
 ChangedPath = NamedTuple("ChangedPath", [("path", str), ("status", str)])
 
 
@@ -548,6 +605,7 @@ class Repo(QObject, QmlTypeMixin):
     updatingChanged = pyqtSignal(bool)
     fetchingChanged = pyqtSignal(bool)
     pullingChanged = pyqtSignal(bool)
+    checkingoutChanged = pyqtSignal(bool)
 
     def __init__(self, path, name="", parent=None):
         super().__init__(parent)
@@ -577,6 +635,11 @@ class Repo(QObject, QmlTypeMixin):
         self._pullWorker.pullprogress.connect(self._setPulling)
         self._pullWorker.output.connect(self._output.appendOutput)
 
+        self._checkoutWorker = GitCheckoutWorker(self._path)
+        self._checkoutWorker.moveToThread(self._workerThread)
+        self._checkoutWorker.checkoutprogress.connect(self._setCheckingOut)
+        self._checkoutWorker.output.connect(self._output.appendOutput)
+
         self._branch = ""
         self._branches = []
         self._tracking_branch = ""
@@ -599,6 +662,9 @@ class Repo(QObject, QmlTypeMixin):
 
         self._pulling = False
         self._pullTriggered = False
+
+        self._checkingout = False
+        self._checkoutTriggered = False
 
         self.triggerUpdate()
 
@@ -679,6 +745,26 @@ class Repo(QObject, QmlTypeMixin):
             return
         self._pullWorker.pull.emit(self._path)
         self._pullTriggered = True
+
+    @pyqtProperty(bool, notify=checkingoutChanged)
+    def checkingout(self):
+        return self._checkingout
+
+    def _setCheckingOut(self, checkingout):
+        if self._checkingout != checkingout:
+            self._checkingout = checkingout
+            self.checkingoutChanged.emit(self._checkingout)
+        if not checkingout:
+            self._checkoutTriggered = False
+            self.triggerUpdate()
+
+    @pyqtSlot(str)
+    def triggerCheckoutBranch(self, branch):
+        if self._checkoutTriggered:
+            LOGGER.debug("Checkout already triggered...")
+            return
+        self._checkoutWorker.checkoutBranch.emit(branch)
+        self._checkoutTriggered = True
 
     @pyqtSlot(object)
     def _onStatusUpdated(self, status):

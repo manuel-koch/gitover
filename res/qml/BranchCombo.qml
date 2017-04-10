@@ -42,6 +42,12 @@ Item {
             font: root.font
         }
 
+        onActivated: {
+            if( index > 1 )
+                repository.triggerCheckoutBranch( textAt(index) )
+            currentIndex = 0
+        }
+
         function selectBranch(branch) {
             theCombo.currentIndex = theCombo.find(branch)
         }

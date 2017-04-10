@@ -41,7 +41,7 @@ from PyQt5.QtQuick import QQuickView
 import gitover.ui.resources  # Only need this to get access to embedded Qt resources
 from gitover.repos_model import ReposModel, Repo
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 LOGGER = logging.getLogger(__name__)
 
