@@ -858,6 +858,8 @@ class Repo(QObject, QmlTypeMixin):
                 diff = repo.git.diff("--", path)
             elif status == "staged":
                 diff = repo.git.diff("--", path, cached=True)
+            elif status == "untracked":
+                diff = open(os.path.join(self._path, path), "r").read()
         return diff
 
     @pyqtProperty(str, notify=pathChanged)
