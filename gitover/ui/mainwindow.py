@@ -25,17 +25,13 @@ import logging
 import os
 import sys
 
-import git
-
 from PyQt5 import QtCore
-from PyQt5.QtCore import qInstallMessageHandler, QSize, Qt, pyqtSlot
+from PyQt5.QtCore import Qt, qInstallMessageHandler
 from PyQt5.QtCore import QThread
 from PyQt5.QtCore import QUrl
-from PyQt5.QtCore import QTimer
 from PyQt5.QtCore import QSettings
-from PyQt5.QtGui import QGuiApplication, QIcon, QPixmap, QPainter, QColor, QFont, QTextOption
+from PyQt5.QtGui import QGuiApplication, QIcon
 from PyQt5.QtQml import QQmlApplicationEngine
-from PyQt5.QtWidgets import QSystemTrayIcon
 from PyQt5.QtQuick import QQuickView
 
 import gitover.ui.resources  # Only need this to get access to embedded Qt resources
