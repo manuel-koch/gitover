@@ -78,34 +78,24 @@ ApplicationWindow {
         property bool hasRepos: globalRepositories.nofRepos != 0
     }
 
-    ColumnLayout {
+    SplitView {
         anchors.fill:    parent
         anchors.margins: 2
-        spacing:         2
-
-        Text {
-            Layout.fillWidth:    true
-            Layout.fillHeight:   true
-            verticalAlignment:   Text.AlignVCenter
-            horizontalAlignment: Text.AlignHCenter
-            text:                "Display overview(s) by <a href='open'>opening</a> a git repository..."
-            onLinkActivated:     theAddRepoDialog.openDialog()
-            visible:             !internal.hasRepos
-        }
+        orientation:     Qt.Vertical
 
         GridView {
             id: theRepoGrid
-            Layout.fillWidth:  true
-            Layout.fillHeight: true
-            clip:              true
-            cellWidth:         width / cellsPerRow
-            cellHeight:        height / Math.ceil(count/cellsPerRow)
-            snapMode:          GridView.SnapToRow
-            boundsBehavior:    Flickable.StopAtBounds
-            visible:           internal.hasRepos
+            Layout.minimumHeight: 200
+            Layout.fillHeight:    true
+            clip:                 true
+            cellWidth:            width / cellsPerRow
+            cellHeight:           height / Math.ceil(count/cellsPerRow)
+            snapMode:             GridView.SnapToRow
+            boundsBehavior:       Flickable.StopAtBounds
+            visible:              internal.hasRepos
 
             property int cellSpacing: 2
-            property int cellsPerRow: 5
+            property int cellsPerRow: Math.min(count,5)
             property Repo repository: null
 
             model: globalRepositories
@@ -133,8 +123,8 @@ ApplicationWindow {
 
         TabView {
             id: theTabView
-            Layout.fillWidth:       true
-            Layout.fillHeight:      false
+            Layout.minimumHeight:   100
+            Layout.fillHeight:      true
             Layout.preferredHeight: root.height / 3
             visible:                internal.hasRepos
             Tab {
@@ -147,23 +137,22 @@ ApplicationWindow {
             }
             Tab {
                 title: "Status"
-                RowLayout {
-                    spacing: 2
+                SplitView {
                     RepoStatusList {
                         id: theRepoChanges
-                        Layout.fillWidth:  true
-                        Layout.fillHeight: true
-                        repository:        theRepoGrid.repository
-                        visible:           internal.hasRepos
+                        Layout.minimumWidth: 200
+                        Layout.fillHeight:   true
+                        repository:          theRepoGrid.repository
+                        visible:             internal.hasRepos
                     }
                     RepoStatusDiff {
                         id: theStatusDiff
-                        Layout.fillWidth:  true
-                        Layout.fillHeight: true
-                        repository:        theRepoGrid.repository
-                        path:              theRepoChanges.currentPath
-                        status:            theRepoChanges.currentStatus
-                        visible:           internal.hasRepos
+                        Layout.minimumWidth: 200
+                        Layout.fillHeight:   true
+                        repository:          theRepoGrid.repository
+                        path:                theRepoChanges.currentPath
+                        status:              theRepoChanges.currentStatus
+                        visible:             internal.hasRepos
                     }
                 }
             }
@@ -176,5 +165,12 @@ ApplicationWindow {
                 }
             }
         }
+    }
+
+    Text {
+        anchors.centerIn:    parent
+        text:                "Display overview(s) by <a href='open'>opening</a> a git repository..."
+        onLinkActivated:     theAddRepoDialog.openDialog()
+        visible:             !internal.hasRepos
     }
 }
