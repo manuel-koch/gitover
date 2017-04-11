@@ -35,7 +35,7 @@ import git
 from git.cmd import handle_process_output
 from git.util import finalize_process
 
-from PyQt5.QtCore import QModelIndex, pyqtSlot
+from PyQt5.QtCore import QModelIndex, pyqtSlot, Q_ENUMS
 from PyQt5.QtCore import QVariant
 from PyQt5.QtCore import Qt, pyqtProperty, pyqtSignal, QObject
 from PyQt5.QtCore import QAbstractItemModel
@@ -473,11 +473,14 @@ class GitCheckoutWorker(QObject):
 ChangedPath = NamedTuple("ChangedPath", [("path", str), ("status", str)])
 
 
-class ChangedFilesModel(QAbstractItemModel):
+class ChangedFilesModel(QAbstractItemModel, QmlTypeMixin):
     """Model of changed files of a repository arranged in rows"""
 
-    STATUS_REPO = Qt.UserRole + 1
-    PATH_REPO = Qt.UserRole + 2
+    class Role:
+        Status = Qt.UserRole + 1
+        Path = Qt.UserRole + 2
+
+    Q_ENUMS(Role)
 
     def __init__(self, parent=None):
         """Construct changed files model"""
@@ -486,8 +489,8 @@ class ChangedFilesModel(QAbstractItemModel):
 
     def roleNames(self):
         roles = super().roleNames()
-        roles[ChangedFilesModel.STATUS_REPO] = b"status"
-        roles[ChangedFilesModel.PATH_REPO] = b"path"
+        roles[ChangedFilesModel.Role.Status] = b"status"
+        roles[ChangedFilesModel.Role.Path] = b"path"
         return roles
 
     def index(self, row, col, parent=None):
@@ -506,9 +509,9 @@ class ChangedFilesModel(QAbstractItemModel):
         entry = self._entries[idx.row()]
         if role == Qt.DisplayRole:
             return entry.path
-        if role == ChangedFilesModel.PATH_REPO:
+        if role == ChangedFilesModel.Role.Path:
             return entry.path
-        if role == ChangedFilesModel.STATUS_REPO:
+        if role == ChangedFilesModel.Role.Status:
             return entry.status
 
         return None
@@ -606,6 +609,8 @@ class Repo(QObject, QmlTypeMixin):
     fetchingChanged = pyqtSignal(bool)
     pullingChanged = pyqtSignal(bool)
     checkingoutChanged = pyqtSignal(bool)
+
+    statusUpdated = pyqtSignal()
 
     def __init__(self, path, name="", parent=None):
         super().__init__(parent)
@@ -792,6 +797,7 @@ class Repo(QObject, QmlTypeMixin):
                                  deleted=sorteditems(status.deleted),
                                  conflicting=sorteditems(status.conflicts),
                                  untracked=sorteditems(status.untracked))
+        self.statusUpdated.emit()
 
     def _config(self):
         cfg = Config()
@@ -839,6 +845,18 @@ class Repo(QObject, QmlTypeMixin):
                  {"title": ""}]
         tools += cfg.tools()
         return QVariant(tools)
+
+    @pyqtSlot(str, str, result=str)
+    def diff(self, path, status):
+        """Returns textual diff of given repository path using given status"""
+        repo = git.Repo(self._path)
+        diff = ""
+        if path:
+            if status == "modified":
+                diff = repo.git.diff("--", path)
+            elif status == "staged":
+                diff = repo.git.diff("--", path, cached=True)
+        return diff
 
     @pyqtProperty(str, notify=pathChanged)
     def path(self):

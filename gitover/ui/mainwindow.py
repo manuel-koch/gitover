@@ -39,9 +39,9 @@ from PyQt5.QtWidgets import QSystemTrayIcon
 from PyQt5.QtQuick import QQuickView
 
 import gitover.ui.resources  # Only need this to get access to embedded Qt resources
-from gitover.repos_model import ReposModel, Repo
+from gitover.repos_model import ReposModel, Repo, ChangedFilesModel
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 LOGGER = logging.getLogger(__name__)
 
@@ -87,6 +87,7 @@ def run_gui(repo_paths):
 
     ReposModel.registerToQml()
     Repo.registerToQml()
+    ChangedFilesModel.registerToQml()
 
     settings = QSettings()
     settings.beginGroup("MainWindow")

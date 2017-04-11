@@ -147,10 +147,24 @@ ApplicationWindow {
             }
             Tab {
                 title: "Status"
-                RepoStatusList {
-                    id: theRepoChanges
-                    repository: theRepoGrid.repository
-                    visible:    internal.hasRepos
+                RowLayout {
+                    spacing: 2
+                    RepoStatusList {
+                        id: theRepoChanges
+                        Layout.fillWidth:  true
+                        Layout.fillHeight: true
+                        repository:        theRepoGrid.repository
+                        visible:           internal.hasRepos
+                    }
+                    RepoStatusDiff {
+                        id: theStatusDiff
+                        Layout.fillWidth:  true
+                        Layout.fillHeight: true
+                        repository:        theRepoGrid.repository
+                        path:              theRepoChanges.currentPath
+                        status:            theRepoChanges.currentStatus
+                        visible:           internal.hasRepos
+                    }
                 }
             }
             Tab {

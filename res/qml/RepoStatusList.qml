@@ -31,6 +31,8 @@ Rectangle {
     clip:          true
 
     property Repo repository: null
+    property string currentPath: ""
+    property string currentStatus: ""
 
     ListView {
         id: theList
@@ -41,6 +43,27 @@ Rectangle {
         boundsBehavior:           Flickable.StopAtBounds
 
         model: repository !== null ? repository.changes : null
+
+        onModelChanged: selectEntry(-1)
+
+        onCountChanged: {
+            if( currentIndex >= count )
+                selectEntry(-1)
+        }
+
+        function selectEntry(index) {
+            currentIndex = index
+            console.log("currentIndex",currentIndex)
+            if( currentIndex != -1) {
+                var idx = model.index(currentIndex,0)
+                root.currentPath = model.data(idx,ChangedFilesModel.Path)
+                root.currentStatus = model.data(idx,ChangedFilesModel.Status)
+             }
+             else {
+                root.currentPath = ""
+                root.currentStatus = ""
+             }
+        }
 
         headerPositioning: ListView.OverlayHeader
         header: Rectangle {
@@ -73,9 +96,24 @@ Rectangle {
             }
         }
 
-        delegate: Text {
-            text:           path
-            font.pointSize: 10
+        highlightFollowsCurrentItem: true
+        highlightMoveVelocity:       1000
+        highlightResizeDuration:     0
+        highlight: Rectangle {
+            color: Theme.colors.selectedRepoBg
+        }
+
+        delegate: Item {
+            width:  theList.width
+            height: childrenRect.height
+            Text {
+                text:           path
+                font.pointSize: 10
+            }
+            MouseArea {
+                anchors.fill: parent
+                onClicked:    theList.selectEntry(index)
+            }
         }
     }
 }

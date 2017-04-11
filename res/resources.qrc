@@ -6,6 +6,7 @@
     <file>qml/BranchCombo.qml</file>
     <file>qml/LabelValueRow.qml</file>
     <file>qml/RepoOutputList.qml</file>
+    <file>qml/RepoStatusDiff.qml</file>
     <file>qml/RepoStatusList.qml</file>
     <file>qml/RepoDetailView.qml</file>
     <file>qml/RepoView.qml</file>
