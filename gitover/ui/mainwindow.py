@@ -66,7 +66,7 @@ def getResourceUrl(path):
         return QUrl.fromLocalFile(os.path.join(base_dir, 'res/'+path))
 
 
-def run_gui(repo_paths):
+def run_gui(repo_paths, watch_filesystem):
     """Run GUI application"""
     LOGGER.info("Starting...")
 
@@ -93,9 +93,8 @@ def run_gui(repo_paths):
     h = settings.value("height", 600)
     settings.endGroup()
 
-    repos = ReposModel()
-    for rootpath in repo_paths:
-        repos.addRepo(Repo(rootpath))
+    repos = ReposModel(watch_filesystem=watch_filesystem)
+    [repos.addRepo(Repo(path)) for path in repo_paths]
 
     engine = QQmlApplicationEngine(app)
     engine.setOutputWarningsToStandardError(True)

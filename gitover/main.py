@@ -76,6 +76,8 @@ def main():
                          help='Be more verbose on console.')
     grpMisc.add_argument('--log', dest='logPath', metavar="PATH",
                          help='Store verbose messages during processing in given file too.')
+    grpMisc.add_argument('--no-fs-watch', dest='watchFs', action="store_false", default=True,
+                         help="Don't watch filesystem changes in repositories.")
     args = parser.parse_args()
 
     setupLogging(args.verbose, args.logPath)
@@ -85,7 +87,7 @@ def main():
         # We want to handle it as interrupt instead
         signal.signal(signal.SIGBREAK, signal.default_int_handler)
 
-    return run_gui(repo_paths=args.repos)
+    return run_gui(repo_paths=args.repos, watch_filesystem=args.watchFs)
 
 
 if __name__ == '__main__':

@@ -55,12 +55,13 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
 
     ROLE_REPO = Qt.UserRole + 1
 
-    def __init__(self, parent=None):
+    def __init__(self, watch_filesystem=True, parent=None):
         """Construct repositories model"""
         super().__init__(parent)
         self._workerThread = QThread(self, objectName="workerThread")
         self._workerThread.start()
 
+        self._watchFs = watch_filesystem
         self._fsWatcher = RepoFsWatcher()
         self._fsWatcher.moveToThread(self._workerThread)
         self._fsWatcher.repoChanged.connect(self._onRepoChanged)
@@ -165,7 +166,8 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
             name = subpath[len(rootpath) + 1:]
             self.addRepo(Repo(subpath, name))
 
-        self._fsWatcher.track.emit(rootpath)
+        if self._watchFs:
+            self._fsWatcher.track.emit(rootpath)
 
     def _onRepoChanged(self, path):
         roots = [(repo.path, repo) for repo in self._repos]
