@@ -98,12 +98,12 @@ class RepoFsWatcher(QObject):
                     self._repos.remove(repo)
                     break
         else:
-            LOGGER.debug("Stop tracking...")
+            LOGGER.info("Stop tracking...")
             trackedPaths = self._fswatcher.files() + self._fswatcher.directories()
             if trackedPaths:
                 self._fswatcher.removePaths(trackedPaths)
             self._repos = []
-            LOGGER.debug("Stopped tracking")
+            LOGGER.info("Stopped tracking")
 
     def _stopTracking(self, repo, path):
         LOGGER.debug("Stop tracking\n\t in repo %s\n\tfor path %s", repo.working_dir, path)
@@ -212,5 +212,5 @@ class RepoFsWatcher(QObject):
             if repoPaths:
                 roots.add(repo.working_dir)
         for root in roots:
-            LOGGER.debug("FsWatcher._onFlushChanged %s", root)
+            LOGGER.info("Repository filesystem change detected: %s", root)
             self.repoChanged.emit(root)
