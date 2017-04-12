@@ -37,7 +37,7 @@ from PyQt5.QtQuick import QQuickView
 import gitover.ui.resources  # Only need this to get access to embedded Qt resources
 from gitover.repos_model import ReposModel, Repo, ChangedFilesModel
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 LOGGER = logging.getLogger(__name__)
 
@@ -78,6 +78,8 @@ def run_gui(repo_paths, watch_filesystem):
     app.setApplicationVersion("{}".format(__version__))
     app.setWindowIcon(QIcon(':/icon.png'))
     QThread.currentThread().setObjectName('mainThread')
+
+    LOGGER.info("{} ({})".format(app.applicationName(),app.applicationVersion()))
 
     qInstallMessageHandler(messageHandler)
 

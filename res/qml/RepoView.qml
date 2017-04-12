@@ -172,7 +172,7 @@ Rectangle {
                 Layout.preferredHeight: theNameLabel.height
                 fillMode:               Image.Stretch
                 source:                 "../checkout.png"
-                visible:                root.repository && root.repository.checkingout
+                visible:                root.repository && (root.repository.checkingout || root.repository.rebasing)
             }
         }
         LabelValueRow {

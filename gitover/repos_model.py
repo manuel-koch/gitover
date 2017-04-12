@@ -462,9 +462,181 @@ class GitCheckoutWorker(QObject):
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
         except:
-            LOGGER.exception("Failed to pull git repo at {}".format(path))
+            LOGGER.exception("Failed to checkout git repo at {}".format(self._path))
         finally:
             self.checkoutprogress.emit(False)
+
+    def _onOutput(self, line):
+        line = line.rstrip()
+        LOGGER.debug(line)
+        self.output.emit(line)
+
+
+class GitRebaseWorker(QObject):
+    """Host git rebase action within worker thread"""
+
+    # signal gets emitted to trigger rebase onto given reference
+    rebase = pyqtSignal(str)
+
+    # signal gets emitted to trigger skip of current patch while rebasing
+    skip = pyqtSignal()
+
+    # signal gets emitted to trigger continue rebasing
+    cont = pyqtSignal()
+
+    # signal gets emitted to trigger abort of rebase
+    abort = pyqtSignal()
+
+    # signal gets emitted to trigger check if rebase is still in progress
+    check = pyqtSignal()
+
+    # signal gets emitted when starting/stopping rebase action
+    rebaseprogress = pyqtSignal(bool)
+
+    # signal gets emitted when a problem was detected during rebase, e.g. conflicts
+    rebaseproblem = pyqtSignal()
+
+    # signal gets emitted for every generated output line during rebase
+    output = pyqtSignal(str)
+
+    def __init__(self, path):
+        super().__init__()
+        self._path = path
+        self._repo = git.Repo(self._path)
+        self._rebasing = False
+        self._rebaseStash = ""
+        self._testPaths = [os.path.join(self._repo.git_dir, "rebase-merge", "done"),
+                           os.path.join(self._repo.git_dir, "rebase-apply", "rebasing")]
+        self.rebase.connect(self._onStartRebase)
+        self.skip.connect(self._onSkipRebase)
+        self.cont.connect(self._onContinueRebase)
+        self.abort.connect(self._onAbortRebase)
+        self.check.connect(self.checkRebasing)
+
+    @pyqtSlot(result=bool)
+    def checkRebasing(self):
+        """Check whether rebase is still in progress"""
+        rebasing = any([os.path.exists(p) for p in self._testPaths])
+        if self._rebasing != rebasing:
+            self._rebasing = rebasing
+            self.rebaseprogress.emit(self._rebasing)
+            if not self._rebasing and self._rebaseStash:
+                self._stashPop()
+        return self._rebasing
+
+    def _stash(self):
+        """Stash dirty changes as preparation of rebase"""
+        dirty = self._repo.is_dirty()
+        if dirty:
+            self._rebaseStash = "Automatic stash before rebase: {}".format(
+                "".join(random.sample(string.ascii_letters + string.digits, 32)))
+            proc = self._repo.git.stash("save", self._rebaseStash,
+                                        with_extended_output=True, as_process=True)
+            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+
+    def _stashPop(self):
+        """Pop stash to finalize after rebase finished"""
+        if not self._rebaseStash:
+            return
+        stashed = self._repo.git.stash("list").split("\n")
+        stashed = self._rebaseStash in stashed[0] if stashed else False
+        if stashed:
+            proc = self._repo.git.stash("pop",
+                                        with_extended_output=True, as_process=True)
+            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+        self._rebaseStash = ""
+
+    @pyqtSlot(str)
+    def _onStartRebase(self, ref):
+        """Rebase onto selected reference"""
+        try:
+            if self._rebasing:
+                return
+            self._rebasing = True
+            self.rebaseprogress.emit(True)
+
+            if ref not in self._repo.references:
+                commits = list(self._repo.iter_commits(rev=ref))
+                if ref not in commits:
+                    return
+
+            self._stash()
+
+            proc = self._repo.git.rebase(ref,
+                                         with_extended_output=True, as_process=True)
+            try:
+                handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+            except git.exc.GitCommandError as e:
+                LOGGER.error("Rebase git repo at {} failed or found conflicts: {}"
+                             .format(self._path, e))
+                self.rebaseproblem.emit()
+
+            if not self.checkRebasing():
+                self._stashPop()
+        except:
+            LOGGER.exception("Failed to rebase git repo at {}".format(self._path))
+
+    @pyqtSlot()
+    def _onContinueRebase(self):
+        """Continue rebase"""
+        try:
+            if not self._rebasing:
+                return
+            # can't use "continue" argument directly due to reserved keyword
+            kwargs = {"continue": True}
+            proc = self._repo.git.rebase(**kwargs,
+                                         with_extended_output=True, as_process=True)
+            try:
+                handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+            except git.exc.GitCommandError as e:
+                LOGGER.error("Continue rebase git repo at {} failed or found conflicts: {}"
+                             .format(self._path, e))
+                self.rebaseproblem.emit()
+
+            if not self.checkRebasing():
+                self._stashPop()
+        except:
+            LOGGER.exception("Failed to continue rebase git repo at {}".format(self._path))
+
+    @pyqtSlot()
+    def _onSkipRebase(self):
+        """Skip current patch while rebasing"""
+        try:
+            if not self._rebasing:
+                return
+            proc = self._repo.git.rebase(skip=True,
+                                         with_extended_output=True, as_process=True)
+            try:
+                handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+            except git.exc.GitCommandError as e:
+                LOGGER.error("Skip rebase git repo at {} failed or found conflicts: {}"
+                             .format(self._path, e))
+                self.rebaseproblem.emit()
+
+            if not self.checkRebasing():
+                self._stashPop()
+        except:
+            LOGGER.exception("Failed to skip rebase git repo at {}".format(self._path))
+
+    @pyqtSlot()
+    def _onAbortRebase(self):
+        """Abort rebase"""
+        try:
+            if not self._rebasing:
+                return
+            proc = self._repo.git.rebase(abort=True,
+                                         with_extended_output=True, as_process=True)
+            try:
+                handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+            except git.exc.GitCommandError as e:
+                LOGGER.error("Abort rebase git repo at {} failed or found conflicts: {}"
+                             .format(self._path, e))
+                self.rebaseproblem.emit()
+
+            if not self.checkRebasing():
+                self._stashPop()
+        except:
+            LOGGER.exception("Failed to abort rebase git repo at {}".format(self._path))
 
     def _onOutput(self, line):
         line = line.rstrip()
@@ -611,6 +783,7 @@ class Repo(QObject, QmlTypeMixin):
     fetchingChanged = pyqtSignal(bool)
     pullingChanged = pyqtSignal(bool)
     checkingoutChanged = pyqtSignal(bool)
+    rebasingChanged = pyqtSignal(bool)
 
     statusUpdated = pyqtSignal()
 
@@ -647,6 +820,12 @@ class Repo(QObject, QmlTypeMixin):
         self._checkoutWorker.checkoutprogress.connect(self._setCheckingOut)
         self._checkoutWorker.output.connect(self._output.appendOutput)
 
+        self._rebaseWorker = GitRebaseWorker(self._path)
+        self._rebaseWorker.moveToThread(self._workerThread)
+        self._rebaseWorker.rebaseprogress.connect(self._setRebasing)
+        self._rebaseWorker.rebaseproblem.connect(self.triggerUpdate)
+        self._rebaseWorker.output.connect(self._output.appendOutput)
+
         self._branch = ""
         self._branches = []
         self._tracking_branch = ""
@@ -672,6 +851,9 @@ class Repo(QObject, QmlTypeMixin):
 
         self._checkingout = False
         self._checkoutTriggered = False
+
+        self._rebasing = False
+        self._rebaseTriggered = False
 
         self.triggerUpdate()
 
@@ -773,6 +955,26 @@ class Repo(QObject, QmlTypeMixin):
         self._checkoutWorker.checkoutBranch.emit(branch)
         self._checkoutTriggered = True
 
+    @pyqtProperty(bool, notify=rebasingChanged)
+    def rebasing(self):
+        return self._rebasing
+
+    def _setRebasing(self, rebasing):
+        if self._rebasing != rebasing:
+            self._rebasing = rebasing
+            self.rebasingChanged.emit(self._rebasing)
+        if not rebasing:
+            self._rebaseTriggered = False
+            self.triggerUpdate()
+
+    @pyqtSlot(str)
+    def triggerRebase(self, ref):
+        if self._rebaseTriggered:
+            LOGGER.debug("Rebase already triggered...")
+            return
+        self._rebaseWorker.rebase.emit(ref)
+        self._rebaseTriggered = True
+
     @pyqtSlot(object)
     def _onStatusUpdated(self, status):
         def sorteditems(it):
@@ -799,6 +1001,8 @@ class Repo(QObject, QmlTypeMixin):
                                  deleted=sorteditems(status.deleted),
                                  conflicting=sorteditems(status.conflicts),
                                  untracked=sorteditems(status.untracked))
+
+        self._rebaseWorker.check.emit()
         self.statusUpdated.emit()
 
     def _config(self):
@@ -820,18 +1024,33 @@ class Repo(QObject, QmlTypeMixin):
         if name == "pull":
             self.triggerPull()
             return
+        if name == "rebasetrunk":
+            self.triggerRebase(self._trunk_branch)
+            return
+        if name == "rebasecont":
+            self._rebaseWorker.cont.emit()
+            return
+        if name == "rebaseskip":
+            self._rebaseWorker.skip.emit()
+            return
+        if name == "rebaseabort":
+            self._rebaseWorker.abort.emit()
+            return
 
         tool = cfg.tool(name)
         if not tool:
             return
 
         def substVar(txt, variables):
-            "Substite named variables in given string"
+            """Substite named variables in given string"""
             for name, value in variables.items():
                 txt = txt.replace("{{{}}}".format(name), value)
             return txt
 
-        vars = {"root": self._path}
+        vars = {"root": self._path,
+                "branch": self._branch,
+                "trackingbranch": self._tracking_branch,
+                "trunkbranch": self._trunk_branch}
         cmd = substVar(tool["cmd"], vars)
         cwd = self._path
         LOGGER.info("Executing command {}:\n\tCommand: {}\n\tCwd: {}".format(name, cmd, cwd))
@@ -840,12 +1059,22 @@ class Repo(QObject, QmlTypeMixin):
     @pyqtSlot(result=QVariant)
     def cmds(self):
         """Returns a list of dict with keys name,title to configure commands for current repository"""
-        cfg = self._config()
         tools = [{"name": "update", "title": "Refresh"},
                  {"name": "fetch", "title": "Fetch"},
-                 {"name": "pull", "title": "Pull"},
-                 {"title": ""}]
-        tools += cfg.tools()
+                 {"name": "pull", "title": "Pull"}]
+        if not self._rebasing:
+            tools.append({"name": "rebasetrunk", "title": "Rebase onto trunk"})
+        else:
+            tools.append({"name": "rebasecont", "title": "Continue rebase"})
+            tools.append({"name": "rebaseskip", "title": "Skip rebase"})
+            tools.append({"name": "rebaseabort", "title": "Abort rebase"})
+
+        cfg = self._config()
+        cfgTools = cfg.tools()
+        if cfgTools:
+            tools.append({"title": ""})
+        tools += cfgTools
+
         return QVariant(tools)
 
     @pyqtSlot(str, str, result=str)
