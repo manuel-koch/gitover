@@ -854,7 +854,7 @@ class Repo(QObject, QmlTypeMixin):
         repo = git.Repo(self._path)
         diff = ""
         if path:
-            if status == "modified":
+            if status in ("modified", "conflict"):
                 diff = repo.git.diff("--", path)
             elif status == "staged":
                 diff = repo.git.diff("--", path, cached=True)
