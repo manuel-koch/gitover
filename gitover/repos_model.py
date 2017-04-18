@@ -21,6 +21,8 @@ Copyright 2017 Manuel Koch
 
 Data model for all repositiories.
 """
+from collections import OrderedDict
+import copy
 import datetime
 import logging
 import os
@@ -178,22 +180,76 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
                 return
 
 
+CommitDetail = NamedTuple("CommitDetail", (("rev", str),
+                                           ("user", str),
+                                           ("msg", str)))
+
+
+class CachedCommitDetails(object):
+    """Caching commit info for sake of performance"""
+
+    def __init__(self):
+        self._cache = OrderedDict()
+        self._lock = threading.Lock()
+
+    def _create(self, rev, repo):
+        """Create and return CommitDetail for selected revision from repository instance"""
+        c = repo.commit(rev)
+        msg = c.message.split("\n")[0].strip()
+        shortrev = repo.git.rev_parse(c.hexsha, short=8)
+        cd = CommitDetail(shortrev, c.author.name, msg)
+        self._cache[rev] = cd
+        return cd
+
+    def get(self, rev, repo=None):
+        """Returns CommitDetail for selected revision from repository instance"""
+        with self._lock:
+            if rev in self._cache:
+                c = copy.copy(self._cache[rev])
+            elif repo:
+                c = self._create(rev, repo)
+            else:
+                c = None
+            while len(self._cache) > 250:
+                self._cache.popitem()
+        return c
+
+
+CACHED_COMMIT_DETAILS = CachedCommitDetails()
+
+
 class GitStatus(object):
     def __init__(self, path):
         self.path = path
         self.branch = ""
         self.branches = []
         self.trackingBranch = ""
-        self.trackingBranchAhead = 0
-        self.trackingBranchBehind = 0
+        self.trackingBranchAhead = []
+        self.trackingBranchBehind = []
         self.trunkBranch = ""
-        self.trunkBranchAhead = 0
-        self.trunkBranchBehind = 0
+        self.trunkBranchAhead = []
+        self.trunkBranchBehind = []
         self.untracked = set()
         self.deleted = set()
         self.modified = set()
         self.conflicts = set()
         self.staged = set()
+
+    def _commitsAheadBehind(self, repo, branch):
+        """Returns tuple of commit hash lists for commits of HEAD that are ahead/behind
+        given repository branch"""
+        ahead, behind = [], []
+        if branch in repo.refs:
+            lines = repo.git.rev_list("{}...HEAD".format(branch), left_right=True).split("\n")
+            lines = [line.strip() for line in lines if line.strip()]
+            for commit in lines:
+                dir, commit = commit[0], commit[1:]
+                if dir == "<":
+                    ahead += [commit]
+                else:
+                    behind += [commit]
+                CACHED_COMMIT_DETAILS.get(commit, repo)
+        return (ahead, behind)
 
     def update(self):
         """Update info from current git repository"""
@@ -226,11 +282,9 @@ class GitStatus(object):
                                          with_exceptions=False)
                 if remote:
                     self.trackingBranch = "{}/{}".format(remote, self.branch)
-                    if self.trackingBranch in repo.refs:
-                        ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trackingBranch),
-                                                          left_right=True, count=True).split("\t")
-                        self.trackingBranchAhead, self.trackingBranchBehind = int(ahead), int(
-                            behind)
+                    ahead, behind = self._commitsAheadBehind(repo, self.trackingBranch)
+                    self.trackingBranchAhead = ahead
+                    self.trackingBranchBehind = behind
         except:
             LOGGER.exception("Failed to get tracking branch ahead/behind counters for {}"
                              .format(self.path))
@@ -239,10 +293,9 @@ class GitStatus(object):
             self.trunkBranch = repo.git.config("gitover.trunkbranch", with_exceptions=False)
             if not self.trunkBranch:
                 self.trunkBranch = "origin/develop"
-            if self.trunkBranch in repo.refs:
-                ahead, behind = repo.git.rev_list("{}...HEAD".format(self.trunkBranch),
-                                                  left_right=True, count=True).split("\t")
-                self.trunkBranchAhead, self.trunkBranchBehind = int(ahead), int(behind)
+            ahead, behind = self._commitsAheadBehind(repo, self.trunkBranch)
+            self.trunkBranchAhead = ahead
+            self.trunkBranchBehind = behind
         except:
             LOGGER.exception(
                 "Failed to get trunk branch ahead/behind counters for {}".format(self.path))
@@ -273,8 +326,6 @@ class GitStatus(object):
         self.modified -= self.conflicts
         self.deleted -= self.conflicts
         self.staged -= self.conflicts
-
-        pass
 
 
 class GitStatusWorker(QObject):
@@ -765,14 +816,22 @@ class Repo(QObject, QmlTypeMixin):
 
     pathChanged = pyqtSignal(str)
     nameChanged = pyqtSignal(str)
+
     branchChanged = pyqtSignal(str)
     branchesChanged = pyqtSignal("QStringList")
+
     trackingBranchChanged = pyqtSignal(str)
     trackingBranchAheadChanged = pyqtSignal(int)
+    trackingBranchAheadCommitsChanged = pyqtSignal("QStringList")
     trackingBranchBehindChanged = pyqtSignal(int)
+    trackingBranchBehindCommitsChanged = pyqtSignal("QStringList")
+
     trunkBranchChanged = pyqtSignal(str)
     trunkBranchAheadChanged = pyqtSignal(int)
+    trunkBranchAheadCommitsChanged = pyqtSignal("QStringList")
     trunkBranchBehindChanged = pyqtSignal(int)
+    trunkBranchBehindCommitsChanged = pyqtSignal("QStringList")
+
     untrackedChanged = pyqtSignal(int)
     modifiedChanged = pyqtSignal(int)
     deletedChanged = pyqtSignal(int)
@@ -828,12 +887,15 @@ class Repo(QObject, QmlTypeMixin):
 
         self._branch = ""
         self._branches = []
+
         self._tracking_branch = ""
-        self._tracking_branch_ahead = 0
-        self._tracking_branch_behind = 0
+        self._tracking_branch_ahead_commits = []
+        self._tracking_branch_behind_commits = []
+
         self._trunk_branch = ""
-        self._trunk_branch_ahead = 0
-        self._trunk_branch_behind = 0
+        self._trunk_branch_ahead_commits = []
+        self._trunk_branch_behind_commits = []
+
         self._untracked = 0
         self._modified = 0
         self._deleted = 0
@@ -985,11 +1047,11 @@ class Repo(QObject, QmlTypeMixin):
         self.branch = status.branch
         self.branches = sorteditems(status.branches)
         self.trackingBranch = status.trackingBranch
-        self.trackingBranchAhead = status.trackingBranchAhead
-        self.trackingBranchBehind = status.trackingBranchBehind
+        self.trackingBranchAheadCommits = status.trackingBranchAhead
+        self.trackingBranchBehindCommits = status.trackingBranchBehind
         self.trunkBranch = status.trunkBranch
-        self.trunkBranchAhead = status.trunkBranchAhead
-        self.trunkBranchBehind = status.trunkBranchBehind
+        self.trunkBranchAheadCommits = status.trunkBranchAhead
+        self.trunkBranchBehindCommits = status.trunkBranchBehind
         self.untracked = len(status.untracked)
         self.modified = len(status.modified)
         self.deleted = len(status.deleted)
@@ -1091,6 +1153,15 @@ class Repo(QObject, QmlTypeMixin):
                 diff = open(os.path.join(self._path, path), "r").read()
         return diff
 
+    @pyqtSlot(str, result=QVariant)
+    def commit(self, rev):
+        """Returns details for commit of given shahex revision"""
+        details = CACHED_COMMIT_DETAILS.get(rev)
+        if details:
+            return dict(rev=details.rev, user=details.user, msg=details.msg)
+        else:
+            return dict(rev=rev, user="", msg="")
+
     @pyqtProperty(str, notify=pathChanged)
     def path(self):
         return self._path
@@ -1133,23 +1204,37 @@ class Repo(QObject, QmlTypeMixin):
 
     @pyqtProperty(int, notify=trackingBranchAheadChanged)
     def trackingBranchAhead(self):
-        return self._tracking_branch_ahead
+        return len(self._tracking_branch_ahead_commits)
 
-    @trackingBranchAhead.setter
-    def trackingBranchAhead(self, ahead):
-        if self._tracking_branch_ahead != ahead:
-            self._tracking_branch_ahead = ahead
-            self.trackingBranchAheadChanged.emit(self._tracking_branch_ahead)
+    @pyqtProperty("QStringList", notify=trackingBranchAheadCommitsChanged)
+    def trackingBranchAheadCommits(self):
+        return self._tracking_branch_ahead_commits
+
+    @trackingBranchAheadCommits.setter
+    def trackingBranchAheadCommits(self, ahead):
+        if self._tracking_branch_ahead_commits != ahead:
+            nofChanged = len(self._tracking_branch_ahead_commits) != len(ahead)
+            self._tracking_branch_ahead_commits = ahead
+            self.trackingBranchAheadCommitsChanged.emit(self._tracking_branch_ahead_commits)
+            if nofChanged:
+                self.trackingBranchAheadChanged.emit(self.trackingBranchAhead)
 
     @pyqtProperty(int, notify=trackingBranchBehindChanged)
     def trackingBranchBehind(self):
-        return self._tracking_branch_behind
+        return len(self._tracking_branch_behind_commits)
 
-    @trackingBranchBehind.setter
-    def trackingBranchBehind(self, behind):
-        if self._tracking_branch_behind != behind:
-            self._tracking_branch_behind = behind
-            self.trackingBranchBehindChanged.emit(self._tracking_branch_behind)
+    @pyqtProperty("QStringList", notify=trackingBranchBehindCommitsChanged)
+    def trackingBranchBehindCommits(self):
+        return self._tracking_branch_behind_commits
+
+    @trackingBranchBehindCommits.setter
+    def trackingBranchBehindCommits(self, behind):
+        if self._tracking_branch_behind_commits != behind:
+            nofChanged = len(self._tracking_branch_behind_commits) != len(behind)
+            self._tracking_branch_behind_commits = behind
+            self.trackingBranchBehindCommitsChanged.emit(self._tracking_branch_behind_commits)
+            if nofChanged:
+                self.trackingBranchBehindChanged.emit(self.trackingBranchBehind)
 
     @pyqtProperty(str, notify=trunkBranchChanged)
     def trunkBranch(self):
@@ -1163,23 +1248,37 @@ class Repo(QObject, QmlTypeMixin):
 
     @pyqtProperty(int, notify=trunkBranchAheadChanged)
     def trunkBranchAhead(self):
-        return self._trunk_branch_ahead
+        return len(self._trunk_branch_ahead_commits)
 
-    @trunkBranchAhead.setter
-    def trunkBranchAhead(self, ahead):
-        if self._trunk_branch_ahead != ahead:
-            self._trunk_branch_ahead = ahead
-            self.trunkBranchAheadChanged.emit(self._trunk_branch_ahead)
+    @pyqtProperty("QStringList", notify=trunkBranchAheadCommitsChanged)
+    def trunkBranchAheadCommits(self):
+        return self._trunk_branch_ahead_commits
+
+    @trunkBranchAheadCommits.setter
+    def trunkBranchAheadCommits(self, ahead):
+        if self._trunk_branch_ahead_commits != ahead:
+            nofChanged = len(self._trunk_branch_ahead_commits) != len(ahead)
+            self._trunk_branch_ahead_commits = ahead
+            self.trunkBranchAheadCommitsChanged.emit(self._trunk_branch_ahead_commits)
+            if nofChanged:
+                self.trunkBranchAheadChanged.emit(self.trunkBranchAhead)
 
     @pyqtProperty(int, notify=trunkBranchBehindChanged)
     def trunkBranchBehind(self):
-        return self._trunk_branch_behind
+        return len(self._trunk_branch_behind_commits)
 
-    @trunkBranchBehind.setter
-    def trunkBranchBehind(self, behind):
-        if self._trunk_branch_behind != behind:
-            self._trunk_branch_behind = behind
-            self.trunkBranchBehindChanged.emit(self._trunk_branch_behind)
+    @pyqtProperty("QStringList", notify=trunkBranchBehindCommitsChanged)
+    def trunkBranchBehindCommits(self):
+        return self._trunk_branch_behind_commits
+
+    @trunkBranchBehindCommits.setter
+    def trunkBranchBehindCommits(self, behind):
+        if self._trunk_branch_behind_commits != behind:
+            nofChanged = len(self._trunk_branch_behind_commits) != len(behind)
+            self._trunk_branch_behind_commits = behind
+            self.trunkBranchBehindCommitsChanged.emit(self._trunk_branch_behind_commits)
+            if nofChanged:
+                self.trunkBranchBehindChanged.emit(self.trunkBranchBehind)
 
     @pyqtProperty("QStringList", notify=branchesChanged)
     def branches(self):

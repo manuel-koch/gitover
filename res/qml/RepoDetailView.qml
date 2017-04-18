@@ -23,7 +23,6 @@ import Gitover 1.0
 Rectangle {
     id: root
 
-    radius:        4
     border.width:  1
     border.color:  "silver"
     color:         "transparent"
@@ -32,6 +31,7 @@ Rectangle {
     property Repo repository: null
 
     Flickable {
+        id: theFlickable
         anchors.fill:    root
         anchors.margins: 2
         contentWidth:    width
@@ -39,6 +39,7 @@ Rectangle {
 
         ColumnLayout {
             id: theColumns
+            width:   theFlickable.contentWidth
             spacing: 2
             Text {
                 Layout.fillWidth: true
@@ -66,6 +67,34 @@ Rectangle {
                     leftPadding:    10
                     font.pointSize: 10
                 }
+            }
+            BranchDetails {
+                Layout.fillWidth: true
+                title:            "Tracking branch is " + (repository != null ? repository.trackingBranchAhead : 0)+ " commit(s) ahead :"
+                repository:       root.repository
+                commits:          repository != null ? root.repository.trackingBranchAheadCommits : null
+                visible:          repository != null ? repository.trackingBranchAhead : false
+            }
+            BranchDetails {
+                Layout.fillWidth: true
+                title:            "Tracking branch is " + (repository != null ? repository.trackingBranchBehind : 0)+ " commit(s) behind :"
+                repository:       root.repository
+                commits:          repository != null ? root.repository.trackingBranchBehindCommits : null
+                visible:          repository != null ? repository.trackingBranchBehind : false
+            }
+            BranchDetails {
+                Layout.fillWidth: true
+                title:            "Trunk branch is " + (repository != null ? repository.trunkBranchAhead : 0)+ " commit(s) ahead :"
+                repository:       root.repository
+                commits:          repository != null ? root.repository.trunkBranchAheadCommits : null
+                visible:          repository != null ? repository.trunkBranchAhead : false
+            }
+            BranchDetails {
+                Layout.fillWidth: true
+                title:            "Trunk branch is " + (repository != null ? repository.trunkBranchBehind : 0)+ " commit(s) behind :"
+                repository:       root.repository
+                commits:          repository != null ? root.repository.trunkBranchBehindCommits : null
+                visible:          repository != null ? repository.trunkBranchBehind : false
             }
         }
     }
