@@ -182,7 +182,11 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
 
 CommitDetail = NamedTuple("CommitDetail", (("rev", str),
                                            ("user", str),
-                                           ("msg", str)))
+                                           ("msg", str),
+                                           ("changes", list)))
+
+CommitChange = NamedTuple("CommitChange", (("change", str),
+                                           ("path", str)))
 
 
 class CachedCommitDetails(object):
@@ -197,7 +201,9 @@ class CachedCommitDetails(object):
         c = repo.commit(rev)
         msg = c.message.split("\n")[0].strip()
         shortrev = repo.git.rev_parse(c.hexsha, short=8)
-        cd = CommitDetail(shortrev, c.author.name, msg)
+        changes = repo.git.diff_tree(rev, no_commit_id=True, name_status=True, r=True).split("\n")
+        changes = [CommitChange(*c.split("\t")) for c in changes if c.strip()]
+        cd = CommitDetail(shortrev, c.author.name, msg, changes)
         self._cache[rev] = cd
         return cd
 
@@ -1158,9 +1164,11 @@ class Repo(QObject, QmlTypeMixin):
         """Returns details for commit of given shahex revision"""
         details = CACHED_COMMIT_DETAILS.get(rev)
         if details:
-            return dict(rev=details.rev, user=details.user, msg=details.msg)
+            changes = [{"change": c.change, "path": c.path} for c in details.changes]
+            return dict(rev=details.rev, user=details.user,
+                        msg=details.msg, changes=changes)
         else:
-            return dict(rev=rev, user="", msg="")
+            return dict(rev=rev, user="", msg="", changes=[])
 
     @pyqtProperty(str, notify=pathChanged)
     def path(self):

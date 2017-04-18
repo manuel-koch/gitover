@@ -37,6 +37,7 @@ Item {
         text:      root.title
         font.bold: true
     }
+
     Column {
         anchors.top:       theTitle.bottom
         anchors.topMargin: 4
@@ -45,32 +46,59 @@ Item {
         Repeater {
             model: commits
 
-            RowLayout {
-                id: theRow
-                width:  root.width
-                height: theRev.height
+            Column {
+                width: parent.width
 
                 property var details: root.repository.commit(modelData)
 
-                Text {
-                    id: theRev
-                    Layout.leftMargin:     10
-                    Layout.preferredWidth: 60
-                    text:                  details.rev
-                    font.family:           "monospace"
-                    font.pointSize:        10
+                RowLayout {
+                    id: theCommitRow
+                    width:  root.width
+                    height: theRev.height
+
+                    Text {
+                        id: theRev
+                        Layout.leftMargin:     10
+                        Layout.preferredWidth: 60
+                        text:                  details.rev
+                        font.family:           "monospace"
+                        font.pointSize:        10
+                    }
+                    Text {
+                        Layout.preferredWidth: 100
+                        text:                  details.user
+                        font.pointSize:        10
+                        elide:                 Text.ElideRight
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text:             details.msg
+                        font.pointSize:   10
+                        elide:            Text.ElideRight
+                    }
                 }
-                Text {
-                    Layout.preferredWidth: 100
-                    text:                  details.user
-                    font.pointSize:        10
-                    elide:                 Text.ElideRight
-                }
-                Text {
-                    Layout.fillWidth: true
-                    text:             details.msg
-                    font.pointSize:   10
-                    elide:            Text.ElideRight
+                Repeater {
+                    model: details.changes
+                    RowLayout {
+                        id: theChangeRow
+                        width:  root.width
+                        height: theChange.height
+
+                        Text {
+                            id: theChange
+                            Layout.leftMargin:     170 + 2*theCommitRow.spacing
+                            Layout.preferredWidth: 12
+                            text:                  modelData.change
+                            font.family:           "monospace"
+                            font.pointSize:        10
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text:             modelData.path
+                            font.pointSize:   10
+                            elide:            Text.ElideRight
+                        }
+                    }
                 }
             }
         }
