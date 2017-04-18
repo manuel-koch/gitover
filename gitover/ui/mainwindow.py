@@ -52,10 +52,6 @@ def messageHandler(msgType, context, msg):
     else:
         logfunc = LOGGER.info
     logfunc("{}({}): {}".format(context.file, context.line, msg))
-    if "Must construct a QGuiApplication first." in msg:
-        print("CATCH ME")
-        import traceback
-        traceback.print_stack()
 
 
 def getResourceUrl(path):
