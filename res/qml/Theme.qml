@@ -23,21 +23,23 @@ Item {
 
     property QtObject colors: theColors
 
+    // Base Color: 36B036 : http://paletton.com/#uid=72P1z0kmbrBcHF-i0vkqun+tEj5
     QtObject {
         id: theColors
         property color border:                "silver"
-        property color selectedRepoBg:        "#FFFFC6"
-        property color statusRepoUpgradeable: "green"
-        property color statusRepoModified:    "yellow"
-        property color statusStaged:          "#C1036E"
-        property color statusConflict:        "#950000"
+        property color selectedRepoBg:        "#FFF39C"
+        property color statusRepoUpgradeable: "#097A09"
+        property color statusRepoModified:    "#D18DB3"
+        property color statusAdded:           "#60DA60"
+        property color statusStaged:          "#593896"
+        property color statusConflict:        "#432182"
         property color statusModified:        "#007272"
-        property color statusDeleted:         "#F00303"
-        property color statusUntracked:       "#F06E03"
+        property color statusDeleted:         "#FA6D6D"
+        property color statusUntracked:       "#9A81C9"
         property color statusHeaderBg:        "#ECECEC"
         property color statusSectionBg:       "#ACDBDD"
-        property color branchAhead:           "green"
-        property color branchBehind:          "red"
+        property color branchAhead:           "#57C857"
+        property color branchBehind:          "#BF2121"
     }
 
     function colorValToHex(v) {
@@ -50,5 +52,15 @@ Item {
 
     function htmlColor(c) {
         return "#" + colorValToHex(c.r) + colorValToHex(c.g) + colorValToHex(c.b)
+    }
+
+    function changeTypeToColor(change) {
+        if( change == "M" )
+            return theColors.statusModified
+        if( change == "A" )
+            return theColors.statusAdded
+        if( change == "D" )
+            return theColors.statusDeleted
+        return "black"
     }
 }

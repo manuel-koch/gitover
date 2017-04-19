@@ -20,6 +20,7 @@ import QtQuick.Layouts 1.2
 import QtQuick.Controls 1.4
 import QtQuick.Controls.Styles 1.4
 import Gitover 1.0
+import "."
 
 Item {
     id: root
@@ -91,6 +92,7 @@ Item {
                             text:                  modelData.change
                             font.family:           "monospace"
                             font.pointSize:        10
+                            color:                 Theme.changeTypeToColor(text)
                         }
                         Text {
                             Layout.fillWidth: true
