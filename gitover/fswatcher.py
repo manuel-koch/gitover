@@ -27,7 +27,7 @@ class RepoFsWatcher(QObject):
         self._changedQueue = queue.Queue()
         self._updateTrackQueue = queue.Queue()
         self._flushChangedTimer = QTimer(self)
-        self._flushChangedTimer.setInterval(5000)
+        self._flushChangedTimer.setInterval(2000)
         self._flushChangedTimer.setSingleShot(True)
         self._flushChangedTimer.timeout.connect(self._onFlushChanged)
         self._updateTrackTimer = QTimer(self)
