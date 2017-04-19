@@ -83,6 +83,8 @@ ApplicationWindow {
         anchors.margins: 2
         orientation:     Qt.Vertical
 
+        handleDelegate: Item {} // don't want a visible handle
+
         GridView {
             id: theRepoGrid
             Layout.minimumHeight: 200
