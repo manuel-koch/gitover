@@ -26,9 +26,10 @@ Rectangle {
 
     height:        theColumn.implicitHeight + 2*radius
     radius:        4
-    border.width:  internal.hasChanges || internal.canUpgrade ? 2 : 1
-    border.color:  internal.hasChanges ? Theme.colors.statusRepoModified
-                                       : ( internal.canUpgrade ? Theme.colors.statusRepoUpgradeable : Theme.colors.border )
+    border.width:  internal.hasChanges || internal.canUpgrade || theErrorTimer.running ? 2 : 1
+    border.color:  theErrorTimer.running ? Theme.colors.statusRepoError
+                     : (internal.hasChanges ? Theme.colors.statusRepoModified
+                       : (internal.canUpgrade ? Theme.colors.statusRepoUpgradeable : Theme.colors.border))
     color:         "transparent"
     clip:          true
 
@@ -37,6 +38,28 @@ Rectangle {
     signal clicked()
 
     Component.onCompleted: console.debug(repository,repository.name)
+
+    Connections {
+        target: repository
+        onError: {
+            theErrorText.text = msg
+            theErrorTimer.restart()
+        }
+    }
+
+    Timer {
+        id: theErrorTimer
+        interval: 3000
+    }
+
+    Text {
+        id: theErrorText
+        anchors.margins: 4
+        anchors.right:   parent.right
+        anchors.bottom:  parent.bottom
+        color:           Theme.colors.statusRepoError
+        visible:         theErrorTimer.running
+    }
 
     MouseArea {
         anchors.fill: parent

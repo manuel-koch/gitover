@@ -30,6 +30,7 @@ Item {
         property color selectedRepoBg:        "#FFF39C"
         property color statusRepoUpgradeable: "#097A09"
         property color statusRepoModified:    "#D18DB3"
+        property color statusRepoError:       "#FE4E4E"
         property color statusAdded:           "#60DA60"
         property color statusStaged:          "#593896"
         property color statusConflict:        "#432182"

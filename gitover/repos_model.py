@@ -378,6 +378,9 @@ class GitFetchWorker(QObject):
     # signal gets emitted for every generated output line during fetch
     output = pyqtSignal(str)
 
+    # signal gets emitted when an error happened during pull
+    error = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
         self.fetch.connect(self._onFetch)
@@ -411,6 +414,7 @@ class GitFetchWorker(QObject):
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
         except:
             LOGGER.exception("Failed to fetch git repo at {}".format(path))
+            self.error.emit("Failed to fetch")
         self._releaseFetchSlot()
         self.fetchprogress.emit(False)
 
@@ -432,6 +436,9 @@ class GitPullWorker(QObject):
     # signal gets emitted for every generated output line during pull
     output = pyqtSignal(str)
 
+    # signal gets emitted when an error happened during pull
+    error = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
         self.pull.connect(self._onPull)
@@ -443,6 +450,7 @@ class GitPullWorker(QObject):
         try:
             repo = git.Repo(path)
 
+            err_hint = "stash save"
             stash_name = "Automatic stash before pull: {}".format(
                 "".join(random.sample(string.ascii_letters + string.digits, 32)))
             dirty = repo.is_dirty()
@@ -451,10 +459,12 @@ class GitPullWorker(QObject):
                                       with_extended_output=True, as_process=True)
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
+            err_hint = "pull"
             proc = repo.git.pull(prune=True,
                                  verbose=True, with_extended_output=True, as_process=True)
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
+            err_hint = "stash pop"
             stashed = repo.git.stash("list").split("\n")
             stashed = stash_name in stashed[0] if stashed else False
             if stashed:
@@ -464,6 +474,8 @@ class GitPullWorker(QObject):
 
         except:
             LOGGER.exception("Failed to pull git repo at {}".format(path))
+            self.error.emit("Failed to " + err_hint)
+
         self.pullprogress.emit(False)
 
     def _onOutput(self, line):
@@ -484,6 +496,9 @@ class GitCheckoutWorker(QObject):
     # signal gets emitted for every generated output line during checkout
     output = pyqtSignal(str)
 
+    # signal gets emitted when an error happened during pull
+    error = pyqtSignal(str)
+
     def __init__(self, path):
         super().__init__()
         self._path = path
@@ -499,6 +514,7 @@ class GitCheckoutWorker(QObject):
             if branch not in repo.branches:
                 return
 
+            err_hint = "stash save"
             stash_name = "Automatic stash before checkout: {}".format(
                 "".join(random.sample(string.ascii_letters + string.digits, 32)))
             dirty = repo.is_dirty()
@@ -507,10 +523,12 @@ class GitCheckoutWorker(QObject):
                                       with_extended_output=True, as_process=True)
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
+            err_hint = "checkout"
             proc = repo.git.checkout(branch,
                                      with_extended_output=True, as_process=True)
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
+            err_hint = "stash pop"
             stashed = repo.git.stash("list").split("\n")
             stashed = stash_name in stashed[0] if stashed else False
             if stashed:
@@ -520,6 +538,7 @@ class GitCheckoutWorker(QObject):
 
         except:
             LOGGER.exception("Failed to checkout git repo at {}".format(self._path))
+            self.error.emit("Failed to " + err_hint)
         finally:
             self.checkoutprogress.emit(False)
 
@@ -550,11 +569,11 @@ class GitRebaseWorker(QObject):
     # signal gets emitted when starting/stopping rebase action
     rebaseprogress = pyqtSignal(bool)
 
-    # signal gets emitted when a problem was detected during rebase, e.g. conflicts
-    rebaseproblem = pyqtSignal()
-
     # signal gets emitted for every generated output line during rebase
     output = pyqtSignal(str)
+
+    # signal gets emitted when an error/conflict happened during rebase
+    error = pyqtSignal(str)
 
     def __init__(self, path):
         super().__init__()
@@ -626,7 +645,7 @@ class GitRebaseWorker(QObject):
             except git.exc.GitCommandError as e:
                 LOGGER.error("Rebase git repo at {} failed or found conflicts: {}"
                              .format(self._path, e))
-                self.rebaseproblem.emit()
+                self.error.emit("Failed to rebase")
 
             if not self.checkRebasing():
                 self._stashPop()
@@ -648,7 +667,7 @@ class GitRebaseWorker(QObject):
             except git.exc.GitCommandError as e:
                 LOGGER.error("Continue rebase git repo at {} failed or found conflicts: {}"
                              .format(self._path, e))
-                self.rebaseproblem.emit()
+                self.error.emit("Failed to continue rebase")
 
             if not self.checkRebasing():
                 self._stashPop()
@@ -668,7 +687,7 @@ class GitRebaseWorker(QObject):
             except git.exc.GitCommandError as e:
                 LOGGER.error("Skip rebase git repo at {} failed or found conflicts: {}"
                              .format(self._path, e))
-                self.rebaseproblem.emit()
+                self.error.emit("Failed to skip rebase")
 
             if not self.checkRebasing():
                 self._stashPop()
@@ -688,7 +707,7 @@ class GitRebaseWorker(QObject):
             except git.exc.GitCommandError as e:
                 LOGGER.error("Abort rebase git repo at {} failed or found conflicts: {}"
                              .format(self._path, e))
-                self.rebaseproblem.emit()
+                self.error.emit("Failed to abort rebase")
 
             if not self.checkRebasing():
                 self._stashPop()
@@ -852,6 +871,8 @@ class Repo(QObject, QmlTypeMixin):
 
     statusUpdated = pyqtSignal()
 
+    error = pyqtSignal(str, arguments=["msg"])
+
     def __init__(self, path, name="", parent=None):
         super().__init__(parent)
         self.destroyed.connect(self.stopWorker)
@@ -874,22 +895,26 @@ class Repo(QObject, QmlTypeMixin):
         self._fetchWorker.moveToThread(self._workerThread)
         self._fetchWorker.fetchprogress.connect(self._setFetching)
         self._fetchWorker.output.connect(self._output.appendOutput)
+        self._fetchWorker.error.connect(self.error)
 
         self._pullWorker = GitPullWorker()
         self._pullWorker.moveToThread(self._workerThread)
         self._pullWorker.pullprogress.connect(self._setPulling)
         self._pullWorker.output.connect(self._output.appendOutput)
+        self._pullWorker.error.connect(self.error)
 
         self._checkoutWorker = GitCheckoutWorker(self._path)
         self._checkoutWorker.moveToThread(self._workerThread)
         self._checkoutWorker.checkoutprogress.connect(self._setCheckingOut)
         self._checkoutWorker.output.connect(self._output.appendOutput)
+        self._checkoutWorker.error.connect(self.error)
 
         self._rebaseWorker = GitRebaseWorker(self._path)
         self._rebaseWorker.moveToThread(self._workerThread)
         self._rebaseWorker.rebaseprogress.connect(self._setRebasing)
-        self._rebaseWorker.rebaseproblem.connect(self.triggerUpdate)
         self._rebaseWorker.output.connect(self._output.appendOutput)
+        self._rebaseWorker.error.connect(self.triggerUpdate)
+        self._rebaseWorker.error.connect(self.error)
 
         self._branch = ""
         self._branches = []
