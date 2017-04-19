@@ -14,3 +14,8 @@ echo QT5DIR=${QT5DIR}
 # See https://github.com/pyinstaller/pyinstaller/wiki/Development
 #
 pyinstaller --icon $(dirname $0)/res/icon.icns --log-level=DEBUG --debug --onefile --windowed --noconfirm --clean -n GitOver --paths $(dirname $0) $(dirname $0)/gitover/main.py
+
+# Add support for high DPI aka retina displays
+INFO_PLIST=$(dirname $0)/dist/GitOVer.app/Contents/info.plist
+plutil -insert NSPrincipalClass -string NSApplication ${INFO_PLIST}
+plutil -insert NSHighResolutionCapable -string True ${INFO_PLIST}
