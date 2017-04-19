@@ -112,7 +112,7 @@ Rectangle {
             if( m )
                 t.push("<font color='"+Theme.htmlColor(Theme.colors.statusModified)+"'>"+m+"-M</font>")
             if( d )
-                t.push("<font color='"+Theme.htmlColor(Theme.colors.statusModified)+"'>"+d+"-D</font>")
+                t.push("<font color='"+Theme.htmlColor(Theme.colors.statusDeleted)+"'>"+d+"-D</font>")
             if( u )
                 t.push("<font color='"+Theme.htmlColor(Theme.colors.statusUntracked)+"'>"+u+"-U</font>")
             if( !m && !d && !u && !c && !s)
