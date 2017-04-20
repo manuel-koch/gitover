@@ -63,7 +63,8 @@ Rectangle {
                 Layout.fillWidth: true
                 model:            repository != null ? repository.branches : null
                 Text {
-                    text:           modelData
+                    property bool obsolete: root.repository !== null && repository.mergedToTrunkBranches.indexOf(modelData)!=-1
+                    text:           modelData + (obsolete ? " --> <i>(obsolete: already merged to trunk)</i>" : "")
                     leftPadding:    10
                     font.pointSize: 10
                 }

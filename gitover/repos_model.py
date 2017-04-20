@@ -226,20 +226,21 @@ CACHED_COMMIT_DETAILS = CachedCommitDetails()
 
 class GitStatus(object):
     def __init__(self, path):
-        self.path = path
-        self.branch = ""
-        self.branches = []
-        self.trackingBranch = ""
-        self.trackingBranchAhead = []
-        self.trackingBranchBehind = []
-        self.trunkBranch = ""
-        self.trunkBranchAhead = []
-        self.trunkBranchBehind = []
-        self.untracked = set()
-        self.deleted = set()
-        self.modified = set()
-        self.conflicts = set()
-        self.staged = set()
+        self.path = path  # root directory of repository
+        self.branch = ""  # current branch
+        self.branches = []  # all local branches
+        self.mergedToTrunkBranches = []  # all local branches that have been merged to trunk
+        self.trackingBranch = ""  # tracking branch of current branch
+        self.trackingBranchAhead = []  # list of commits that tracking branch is ahead of current branch
+        self.trackingBranchBehind = []  # list of commits that tracking branch is behind of current branch
+        self.trunkBranch = ""  # trunk branch of repositiory
+        self.trunkBranchAhead = []  # list of commits that trunk branch is ahead of current branch
+        self.trunkBranchBehind = []  # list of commits that trunk branch is ahead of current branch
+        self.untracked = set()  # set of untracked paths in repository
+        self.deleted = set()  # set of deleted paths in repository
+        self.modified = set()  # set of modified paths in repository
+        self.conflicts = set()  # set of conflict paths in repository
+        self.staged = set()  # set of staged paths in repository
 
     def _commitsAheadBehind(self, repo, branch):
         """Returns tuple of commit hash lists for commits of HEAD that are ahead/behind
@@ -256,6 +257,13 @@ class GitStatus(object):
                     behind += [commit]
                 CACHED_COMMIT_DETAILS.get(commit, repo)
         return (ahead, behind)
+
+    def _trackingBranch(self, repo, branch):
+        remote = repo.git.config("branch.{}.remote".format(branch), with_exceptions=False)
+        if remote:
+            return "{}/{}".format(remote, branch)
+        else:
+            return ""
 
     def update(self):
         """Update info from current git repository"""
@@ -284,10 +292,8 @@ class GitStatus(object):
 
         try:
             if self.branch in self.branches:
-                remote = repo.git.config("branch.{}.remote".format(self.branch),
-                                         with_exceptions=False)
-                if remote:
-                    self.trackingBranch = "{}/{}".format(remote, self.branch)
+                self.trackingBranch = self._trackingBranch(repo, self.branch)
+                if self.trackingBranch:
                     ahead, behind = self._commitsAheadBehind(repo, self.trackingBranch)
                     self.trackingBranchAhead = ahead
                     self.trackingBranchBehind = behind
@@ -332,6 +338,14 @@ class GitStatus(object):
         self.modified -= self.conflicts
         self.deleted -= self.conflicts
         self.staged -= self.conflicts
+
+        try:
+            merged_branches = [b.replace("*", "").strip()
+                               for b in repo.git.branch(self.trunkBranch, merged=True).split("\n")]
+            merged_branches = [(b, self._trackingBranch(repo, b)) for b in merged_branches]
+            self.mergedToTrunkBranches = [b[0] for b in merged_branches if b[1] != self.trunkBranch]
+        except:
+            LOGGER.exception("Failed to detect branches that are already merged to trunk")
 
 
 class GitStatusWorker(QObject):
@@ -844,6 +858,7 @@ class Repo(QObject, QmlTypeMixin):
 
     branchChanged = pyqtSignal(str)
     branchesChanged = pyqtSignal("QStringList")
+    mergedToTrunkBranchesChanged = pyqtSignal("QStringList")
 
     trackingBranchChanged = pyqtSignal(str)
     trackingBranchAheadChanged = pyqtSignal(int)
@@ -918,6 +933,7 @@ class Repo(QObject, QmlTypeMixin):
 
         self._branch = ""
         self._branches = []
+        self.merged_to_trunk_branches = []
 
         self._tracking_branch = ""
         self._tracking_branch_ahead_commits = []
@@ -1077,6 +1093,7 @@ class Repo(QObject, QmlTypeMixin):
 
         self.branch = status.branch
         self.branches = sorteditems(status.branches)
+        self.mergedToTrunkBranches = sorteditems(status.mergedToTrunkBranches)
         self.trackingBranch = status.trackingBranch
         self.trackingBranchAheadCommits = status.trackingBranchAhead
         self.trackingBranchBehindCommits = status.trackingBranchBehind
@@ -1322,6 +1339,16 @@ class Repo(QObject, QmlTypeMixin):
         if self._branches != branches:
             self._branches = branches
             self.branchesChanged.emit(self._branches)
+
+    @pyqtProperty("QStringList", notify=mergedToTrunkBranchesChanged)
+    def mergedToTrunkBranches(self):
+        return self.merged_to_trunk_branches
+
+    @mergedToTrunkBranches.setter
+    def mergedToTrunkBranches(self, branches):
+        if self.merged_to_trunk_branches != branches:
+            self.merged_to_trunk_branches = branches
+            self.mergedToTrunkBranchesChanged.emit(self.merged_to_trunk_branches)
 
     @pyqtProperty(int, notify=untrackedChanged)
     def untracked(self):
