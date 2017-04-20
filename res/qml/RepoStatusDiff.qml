@@ -53,6 +53,7 @@ Rectangle {
 
         Text {
             id: theDiff
+            font.family: "courier"
 
             onTextChanged: {
                 theFlickable.contentX = 0

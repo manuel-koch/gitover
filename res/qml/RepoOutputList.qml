@@ -59,7 +59,7 @@ Rectangle {
         }
 
         delegate: Text {
-            font.family:    "monospace"
+            font.family:    "courier"
             font.pointSize: 10
             text:           timestamp + ": " + line
         }
