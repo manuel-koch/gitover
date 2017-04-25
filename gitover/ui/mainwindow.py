@@ -22,13 +22,10 @@ Copyright 2017 Manuel Koch
 Main window of git overview.
 """
 import logging
-import os
-import sys
 
 from PyQt5 import QtCore
 from PyQt5.QtCore import Qt, qInstallMessageHandler
 from PyQt5.QtCore import QThread
-from PyQt5.QtCore import QUrl
 from PyQt5.QtCore import QSettings
 from PyQt5.QtGui import QGuiApplication, QIcon
 from PyQt5.QtQml import QQmlApplicationEngine
@@ -36,6 +33,7 @@ from PyQt5.QtQuick import QQuickView
 
 import gitover.ui.resources  # Only need this to get access to embedded Qt resources
 from gitover.repos_model import ReposModel, Repo, ChangedFilesModel
+from gitover.res_helper import getResourceUrl
 
 __version__ = "0.8.2"
 
@@ -52,14 +50,6 @@ def messageHandler(msgType, context, msg):
     else:
         logfunc = LOGGER.info
     logfunc("{}({}): {}".format(context.file, context.line, msg))
-
-
-def getResourceUrl(path):
-    base_dir = os.path.join(os.path.dirname(__file__), "..", "..")
-    if getattr(sys, 'frozen', False):
-        return QUrl("qrc:/"+path)
-    else:
-        return QUrl.fromLocalFile(os.path.join(base_dir, 'res/'+path))
 
 
 def run_gui(repo_paths, watch_filesystem):
