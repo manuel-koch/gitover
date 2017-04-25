@@ -165,37 +165,45 @@ Rectangle {
                 font.bold:              true
                 font.pointSize:         internal.titleFontSize
             }
-            Image {
-                id: theStatusIcon
-                Layout.preferredWidth:  theNameLabel.height
+            RepoActionBadge {
+                id: theStatusBadge
                 Layout.preferredHeight: theNameLabel.height
-                fillMode:               Image.Stretch
-                source:                 "../status.png"
+                text:                   "Status"
+                fgColor:                Theme.colors.badgeText
+                bgColor:                Theme.colors.badgeStatus
                 visible:                root.repository && root.repository.updating
             }
-            Image {
-                id: theFetchIcon
-                Layout.preferredWidth:  theNameLabel.height
+            RepoActionBadge {
+                id: theFetchBadge
                 Layout.preferredHeight: theNameLabel.height
-                fillMode:               Image.Stretch
-                source:                 "../fetch.png"
+                text:                   "Fetch"
+                fgColor:                Theme.colors.badgeText
+                bgColor:                Theme.colors.badgeFetch
                 visible:                root.repository && root.repository.fetching
             }
-            Image {
-                id: thePullIcon
-                Layout.preferredWidth:  theNameLabel.height
+            RepoActionBadge {
+                id: thePullBadge
                 Layout.preferredHeight: theNameLabel.height
-                fillMode:               Image.Stretch
-                source:                 "../sync.png"
+                text:                   "Pull"
+                fgColor:                Theme.colors.badgeText
+                bgColor:                Theme.colors.badgePull
                 visible:                root.repository && root.repository.pulling
             }
-            Image {
-                id: theCheckoutIcon
-                Layout.preferredWidth:  theNameLabel.height
+            RepoActionBadge {
+                id: theCheckoutBadge
                 Layout.preferredHeight: theNameLabel.height
-                fillMode:               Image.Stretch
-                source:                 "../checkout.png"
-                visible:                root.repository && (root.repository.checkingout || root.repository.rebasing)
+                text:                   "Checkout"
+                fgColor:                Theme.colors.badgeText
+                bgColor:                Theme.colors.badgeCheckout
+                visible:                root.repository && root.repository.checkingout
+            }
+            RepoActionBadge {
+                id: theRebaseBadge
+                Layout.preferredHeight: theNameLabel.height
+                text:                   "Rebase"
+                fgColor:                Theme.colors.badgeText
+                bgColor:                Theme.colors.badgeRebase
+                visible:                root.repository && root.repository.rebasing
             }
         }
         LabelValueRow {

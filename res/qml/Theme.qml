@@ -41,6 +41,14 @@ Item {
         property color statusSectionBg:       "#ACDBDD"
         property color branchAhead:           "#57C857"
         property color branchBehind:          "#BF2121"
+
+        property color badgeText:     "white"
+        property color badgeStatus:   "#8095C7"
+        property color badgeFetch:    "#6DAE1E"
+        property color badgePull:     "#98690B"
+        property color badgeCheckout: "#A41C53"
+        property color badgeRebase:   "#BD3A6F"
+
     }
 
     function colorValToHex(v) {
