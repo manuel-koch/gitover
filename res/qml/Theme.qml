@@ -27,7 +27,7 @@ Item {
     QtObject {
         id: theColors
         property color border:                "silver"
-        property color selectedRepoBg:        "#FFF39C"
+        property color selectedRepoBg:        "#E6E6D3"
         property color statusRepoUpgradeable: "#097A09"
         property color statusRepoModified:    "#D18DB3"
         property color statusRepoError:       "#FE4E4E"
