@@ -33,7 +33,7 @@ Item {
     Rectangle {
         id: theBackground
         anchors.fill: parent
-        radius:       Math.min( width, height ) * 0.4
+        radius:       Math.min( theLabel.implicitWidth, theLabel.implicitHeight ) * 0.4
     }
 
     Text {

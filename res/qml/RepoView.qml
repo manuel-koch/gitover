@@ -42,7 +42,7 @@ Rectangle {
     Connections {
         target: repository
         onError: {
-            theErrorText.text = msg
+            theErrorBadge.text = msg
             theErrorTimer.restart()
         }
     }
@@ -52,12 +52,14 @@ Rectangle {
         interval: 3000
     }
 
-    Text {
-        id: theErrorText
+    RepoActionBadge {
+        id: theErrorBadge
         anchors.margins: 4
         anchors.right:   parent.right
         anchors.bottom:  parent.bottom
-        color:           Theme.colors.statusRepoError
+        height:          theNameLabel.height
+        fgColor:         Theme.colors.badgeText
+        bgColor:         Theme.colors.badgeError
         visible:         theErrorTimer.running
     }
 
@@ -204,6 +206,14 @@ Rectangle {
                 fgColor:                Theme.colors.badgeText
                 bgColor:                Theme.colors.badgeRebase
                 visible:                root.repository && root.repository.rebasing
+            }
+            RepoActionBadge {
+                id: thePushBadge
+                Layout.preferredHeight: theNameLabel.height
+                text:                   "Push"
+                fgColor:                Theme.colors.badgeText
+                bgColor:                Theme.colors.badgePush
+                visible:                root.repository && root.repository.pushing
             }
         }
         LabelValueRow {

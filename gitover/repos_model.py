@@ -343,7 +343,8 @@ class GitStatus(object):
             merged_branches = [b.replace("*", "").strip()
                                for b in repo.git.branch(self.trunkBranch, merged=True).split("\n")]
             merged_branches = [(b, self._trackingBranch(repo, b)) for b in merged_branches]
-            self.mergedToTrunkBranches = [b[0] for b in merged_branches if b[1] != self.trunkBranch]
+            self.mergedToTrunkBranches = [b[0] for b in merged_branches if
+                                          b[1] != self.trunkBranch]
         except:
             LOGGER.exception("Failed to detect branches that are already merged to trunk")
 
@@ -734,6 +735,63 @@ class GitRebaseWorker(QObject):
         self.output.emit(line)
 
 
+class GitPushWorker(QObject):
+    """Host git push action within worker thread"""
+
+    # signal gets emitted to trigger pushing given repo branch w/ or w/o force
+    pushBranch = pyqtSignal(str, bool)
+
+    # signal gets emitted when starting/stopping push action
+    pushprogress = pyqtSignal(bool)
+
+    # signal gets emitted for every generated output line during push
+    output = pyqtSignal(str)
+
+    # signal gets emitted when an error happened during push
+    error = pyqtSignal(str)
+
+    def __init__(self, path):
+        super().__init__()
+        self._path = path
+        self.pushBranch.connect(self._onPushBranch)
+
+    @pyqtSlot(str,bool)
+    def _onPushBranch(self, branch, force=False):
+        """Push selected branch to remote, setting upstream when no tracking branch is set yet"""
+        try:
+            self.pushprogress.emit(True)
+            repo = git.Repo(self._path)
+
+            if not repo.active_branch.name:
+                return
+
+            remote = repo.git.config("branch.{}.remote".format(repo.active_branch.name),
+                                     with_exceptions=False)
+
+            kwargs = {}
+            args = []
+            if not remote:
+                kwargs["set_upstream"] = "origin"
+                args.append(repo.active_branch.name)
+            if force:
+                kwargs["force"] = True
+
+            proc = repo.git.push(*args, **kwargs,
+                                 with_extended_output=True, as_process=True)
+            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+
+        except:
+            LOGGER.exception("Failed to push git repo at {}".format(self._path))
+            self.error.emit("Failed to push")
+        finally:
+            self.pushprogress.emit(False)
+
+    def _onOutput(self, line):
+        line = line.rstrip()
+        LOGGER.debug(line)
+        self.output.emit(line)
+
+
 ChangedPath = NamedTuple("ChangedPath", [("path", str), ("status", str)])
 
 
@@ -883,6 +941,7 @@ class Repo(QObject, QmlTypeMixin):
     pullingChanged = pyqtSignal(bool)
     checkingoutChanged = pyqtSignal(bool)
     rebasingChanged = pyqtSignal(bool)
+    pushingChanged = pyqtSignal(bool)
 
     statusUpdated = pyqtSignal()
 
@@ -931,6 +990,12 @@ class Repo(QObject, QmlTypeMixin):
         self._rebaseWorker.error.connect(self.triggerUpdate)
         self._rebaseWorker.error.connect(self.error)
 
+        self._pushWorker = GitPushWorker(self._path)
+        self._pushWorker.moveToThread(self._workerThread)
+        self._pushWorker.pushprogress.connect(self._setPushing)
+        self._pushWorker.output.connect(self._output.appendOutput)
+        self._pushWorker.error.connect(self.error)
+
         self._branch = ""
         self._branches = []
         self.merged_to_trunk_branches = []
@@ -963,6 +1028,9 @@ class Repo(QObject, QmlTypeMixin):
 
         self._rebasing = False
         self._rebaseTriggered = False
+
+        self._pushing = False
+        self._pushTriggered = False
 
         self.triggerUpdate()
 
@@ -1084,6 +1152,26 @@ class Repo(QObject, QmlTypeMixin):
         self._rebaseWorker.rebase.emit(ref)
         self._rebaseTriggered = True
 
+    @pyqtProperty(bool, notify=pushingChanged)
+    def pushing(self):
+        return self._pushing
+
+    def _setPushing(self, pushing):
+        if self._pushing != pushing:
+            self._pushing = pushing
+            self.pushingChanged.emit(self._pushing)
+        if not pushing:
+            self._pushTriggered = False
+            self.triggerUpdate()
+
+    @pyqtSlot(str, bool)
+    def triggerPush(self, branch, force):
+        if self._pushTriggered:
+            LOGGER.debug("Push already triggered...")
+            return
+        self._pushWorker.pushBranch.emit(branch, force)
+        self._pushTriggered = True
+
     @pyqtSlot(object)
     def _onStatusUpdated(self, status):
         def sorteditems(it):
@@ -1134,6 +1222,12 @@ class Repo(QObject, QmlTypeMixin):
         if name == "pull":
             self.triggerPull()
             return
+        if name == "push":
+            self.triggerPush(self.branch, False)
+            return
+        if name == "pushforced":
+            self.triggerPush(self.branch, True)
+            return
         if name == "rebasetrunk":
             self.triggerRebase(self._trunk_branch)
             return
@@ -1178,6 +1272,9 @@ class Repo(QObject, QmlTypeMixin):
             tools.append({"name": "rebasecont", "title": "Continue rebase"})
             tools.append({"name": "rebaseskip", "title": "Skip rebase"})
             tools.append({"name": "rebaseabort", "title": "Abort rebase"})
+        if self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits:
+            tools.append({"name": "push", "title": "Push"})
+            tools.append({"name": "pushforced", "title": "Push (force)"})
 
         cfg = self._config()
         cfgTools = cfg.tools()
