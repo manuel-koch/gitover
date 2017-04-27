@@ -55,7 +55,7 @@ Rectangle {
             }
             Text {
                 Layout.fillWidth: true
-                text:             "Branches :"
+                text:             "Local Branches :"
                 font.bold:        true
                 visible:          root.repository !== null
             }
@@ -67,6 +67,22 @@ Rectangle {
                     text:           modelData + (obsolete ? " --> <i>(obsolete: already merged to trunk)</i>" : "")
                     leftPadding:    10
                     font.pointSize: 10
+                }
+            }
+            Text {
+                Layout.fillWidth: true
+                text:             "Remote Branches :"
+                font.bold:        true
+                visible:          root.repository !== null && repository.remoteBranches.length
+            }
+            Repeater {
+                Layout.fillWidth: true
+                model:            repository != null ? repository.remoteBranches : null
+                Text {
+                    text:           modelData + " --> <a href='checkout'>checkout</a>"
+                    leftPadding:    10
+                    font.pointSize: 10
+                    onLinkActivated: repository.triggerCheckoutBranch(modelData)
                 }
             }
             BranchDetails {

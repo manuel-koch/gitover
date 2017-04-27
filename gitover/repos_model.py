@@ -229,6 +229,7 @@ class GitStatus(object):
         self.path = path  # root directory of repository
         self.branch = ""  # current branch
         self.branches = []  # all local branches
+        self.remoteBranches = []  # all remote branches that could be checked-out
         self.mergedToTrunkBranches = []  # all local branches that have been merged to trunk
         self.trackingBranch = ""  # tracking branch of current branch
         self.trackingBranchAhead = []  # list of commits that tracking branch is ahead of current branch
@@ -287,6 +288,17 @@ class GitStatus(object):
             branches = [b.name for b in repo.branches]
             branches.sort(key=str.lower)
             self.branches = branches
+        except:
+            LOGGER.exception("Invalid branches for {}".format(self.path))
+
+        try:
+            trackedBranches = [self._trackingBranch(repo, b) for b in self.branches]
+            remoteBranches = [r.name for r in repo.references
+                              if isinstance(r, git.RemoteReference) and
+                              not r.name.endswith("/HEAD") and
+                              r.name not in trackedBranches]
+            remoteBranches.sort(key=str.lower)
+            self.remoteBranches = remoteBranches
         except:
             LOGGER.exception("Invalid branches for {}".format(self.path))
 
@@ -521,13 +533,18 @@ class GitCheckoutWorker(QObject):
 
     @pyqtSlot(str)
     def _onCheckoutBranch(self, branch):
-        """Checkout selected branch"""
+        """Checkout selected (remote) branch and create a (local) branch if necessary"""
         try:
             self.checkoutprogress.emit(True)
             repo = git.Repo(self._path)
 
-            if branch not in repo.branches:
+            if branch not in repo.references:
+                LOGGER.warning("Skipped checkout of invalid branch {}".format(branch))
                 return
+
+            ref = repo.references[branch]
+            if isinstance(ref, git.RemoteReference):
+                branch = ref.remote_head
 
             err_hint = "stash save"
             stash_name = "Automatic stash before checkout: {}".format(
@@ -755,7 +772,7 @@ class GitPushWorker(QObject):
         self._path = path
         self.pushBranch.connect(self._onPushBranch)
 
-    @pyqtSlot(str,bool)
+    @pyqtSlot(str, bool)
     def _onPushBranch(self, branch, force=False):
         """Push selected branch to remote, setting upstream when no tracking branch is set yet"""
         try:
@@ -916,6 +933,7 @@ class Repo(QObject, QmlTypeMixin):
 
     branchChanged = pyqtSignal(str)
     branchesChanged = pyqtSignal("QStringList")
+    remoteBranchesChanged = pyqtSignal("QStringList")
     mergedToTrunkBranchesChanged = pyqtSignal("QStringList")
 
     trackingBranchChanged = pyqtSignal(str)
@@ -998,7 +1016,8 @@ class Repo(QObject, QmlTypeMixin):
 
         self._branch = ""
         self._branches = []
-        self.merged_to_trunk_branches = []
+        self._remote_branches = []
+        self._merged_to_trunk_branches = []
 
         self._tracking_branch = ""
         self._tracking_branch_ahead_commits = []
@@ -1181,6 +1200,7 @@ class Repo(QObject, QmlTypeMixin):
 
         self.branch = status.branch
         self.branches = sorteditems(status.branches)
+        self.remoteBranches = sorteditems(status.remoteBranches)
         self.mergedToTrunkBranches = sorteditems(status.mergedToTrunkBranches)
         self.trackingBranch = status.trackingBranch
         self.trackingBranchAheadCommits = status.trackingBranchAhead
@@ -1437,15 +1457,25 @@ class Repo(QObject, QmlTypeMixin):
             self._branches = branches
             self.branchesChanged.emit(self._branches)
 
+    @pyqtProperty("QStringList", notify=remoteBranchesChanged)
+    def remoteBranches(self):
+        return self._remote_branches
+
+    @remoteBranches.setter
+    def remoteBranches(self, branches):
+        if self._remote_branches != branches:
+            self._remote_branches = branches
+            self.remoteBranchesChanged.emit(self._remote_branches)
+
     @pyqtProperty("QStringList", notify=mergedToTrunkBranchesChanged)
     def mergedToTrunkBranches(self):
-        return self.merged_to_trunk_branches
+        return self._merged_to_trunk_branches
 
     @mergedToTrunkBranches.setter
     def mergedToTrunkBranches(self, branches):
-        if self.merged_to_trunk_branches != branches:
-            self.merged_to_trunk_branches = branches
-            self.mergedToTrunkBranchesChanged.emit(self.merged_to_trunk_branches)
+        if self._merged_to_trunk_branches != branches:
+            self._merged_to_trunk_branches = branches
+            self.mergedToTrunkBranchesChanged.emit(self._merged_to_trunk_branches)
 
     @pyqtProperty(int, notify=untrackedChanged)
     def untracked(self):
