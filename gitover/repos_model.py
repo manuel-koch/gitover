@@ -1292,10 +1292,10 @@ class Repo(QObject, QmlTypeMixin):
             tools.append({"name": "rebasecont", "title": "Continue rebase"})
             tools.append({"name": "rebaseskip", "title": "Skip rebase"})
             tools.append({"name": "rebaseabort", "title": "Abort rebase"})
-        if self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits:
+        if not self._tracking_branch or self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits:
             tools.append({"name": "push", "title": "Push"})
+        if self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits:
             tools.append({"name": "pushforced", "title": "Push (force)"})
-
         cfg = self._config()
         cfgTools = cfg.tools()
         if cfgTools:
