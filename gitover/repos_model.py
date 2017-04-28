@@ -788,7 +788,8 @@ class GitPushWorker(QObject):
             kwargs = {}
             args = []
             if not remote:
-                kwargs["set_upstream"] = "origin"
+                kwargs["set_upstream"] = True
+                args.append("origin")
                 args.append(repo.active_branch.name)
             if force:
                 kwargs["force"] = True
