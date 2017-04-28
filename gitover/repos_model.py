@@ -295,7 +295,7 @@ class GitStatus(object):
             trackedBranches = [self._trackingBranch(repo, b) for b in self.branches]
             remoteBranches = [r.name for r in repo.references
                               if isinstance(r, git.RemoteReference) and
-                              not r.name.endswith("/HEAD") and
+                              r.name != (r.remote_name+"/HEAD") and
                               r.name not in trackedBranches]
             remoteBranches.sort(key=str.lower)
             self.remoteBranches = remoteBranches
