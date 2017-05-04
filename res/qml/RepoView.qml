@@ -26,16 +26,16 @@ Rectangle {
 
     height:        theColumn.implicitHeight + 2*radius
     radius:        4
-    border.width:  internal.hasChanges || internal.canUpgrade || theErrorTimer.running ? 2 : 1
-    border.color:  theErrorTimer.running ? Theme.colors.statusRepoError
-                     : (internal.hasChanges ? Theme.colors.statusRepoModified
-                       : (internal.canUpgrade ? Theme.colors.statusRepoUpgradeable : Theme.colors.border))
+    border.width:  internal.hasChanges || internal.canUpgrade ? 2 : 1
+    border.color:  internal.hasChanges ? Theme.colors.statusRepoModified
+                       : (internal.canUpgrade ? Theme.colors.statusRepoUpgradeable : Theme.colors.border)
     color:         "transparent"
     clip:          true
 
     property Repo repository: null
 
     signal clicked()
+    signal showOutput()
 
     Component.onCompleted: console.debug(repository,repository.name)
 
@@ -43,24 +43,8 @@ Rectangle {
         target: repository
         onError: {
             theErrorBadge.text = msg
-            theErrorTimer.restart()
+            theErrorBadge.visible = true
         }
-    }
-
-    Timer {
-        id: theErrorTimer
-        interval: 3000
-    }
-
-    RepoActionBadge {
-        id: theErrorBadge
-        anchors.margins: 4
-        anchors.right:   parent.right
-        anchors.bottom:  parent.bottom
-        height:          theNameLabel.height
-        fgColor:         Theme.colors.badgeText
-        bgColor:         Theme.colors.badgeError
-        visible:         theErrorTimer.running
     }
 
     MouseArea {
@@ -293,6 +277,24 @@ Rectangle {
                 elide:          Text.ElideRight
                 text:           internal.changeSummary
                 wrapMode:       Text.Wrap
+            }
+        }
+    }
+
+    RepoActionBadge {
+        id: theErrorBadge
+        anchors.margins: 4
+        anchors.right:   parent.right
+        anchors.bottom:  parent.bottom
+        height:          theNameLabel.height
+        fgColor:         Theme.colors.badgeText
+        bgColor:         Theme.colors.badgeError
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                root.clicked()
+                root.showOutput()
+                theErrorBadge.visible = false
             }
         }
     }

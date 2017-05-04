@@ -103,11 +103,12 @@ ApplicationWindow {
             model: globalRepositories
 
             delegate: RepoView {
-                repository: repo
-                width:      theRepoGrid.cellWidth - ( isLastColumn ? 0 : theRepoGrid.cellSpacing)
-                height:     theRepoGrid.cellHeight - ( isLastRow ? 0 : theRepoGrid.cellSpacing)
-                onClicked:  theRepoGrid.currentIndex = index
-                color:      isCurrent ? Theme.colors.selectedRepoBg : "transparent"
+                repository:   repo
+                width:        theRepoGrid.cellWidth - ( isLastColumn ? 0 : theRepoGrid.cellSpacing)
+                height:       theRepoGrid.cellHeight - ( isLastRow ? 0 : theRepoGrid.cellSpacing)
+                onClicked:    theRepoGrid.currentIndex = index
+                onShowOutput: theTabView.selectTab("Output")
+                color:        isCurrent ? Theme.colors.selectedRepoBg : "transparent"
                 property bool isCurrent:    theRepoGrid.currentIndex == index
                 property int  column:       index % theRepoGrid.cellsPerRow
                 property int  row:          Math.floor( index / theRepoGrid.cellsPerRow )
@@ -129,6 +130,14 @@ ApplicationWindow {
             Layout.fillHeight:      true
             Layout.preferredHeight: root.height / 3
             visible:                internal.hasRepos
+
+            function selectTab(title) {
+                for( var i=0; i<count; i++ ) {
+                    if( getTab(i).title == title )
+                        currentIndex = i
+                }
+            }
+
             Tab {
                 title: "General"
                 RepoDetailView {
