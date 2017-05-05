@@ -1081,6 +1081,7 @@ class Repo(QObject, QmlTypeMixin):
         self._pushTriggered = False
 
         self.triggerUpdate()
+        self.triggerFetch()
 
     def __str__(self):
         return self._path
