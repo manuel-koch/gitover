@@ -53,6 +53,7 @@ class Config(object):
             if cmd:
                 tool["name"] = tool.get("name", cmd.split()[0])
                 tool["title"] = tool.get("title", cmd.split()[0])
+                tool["shortcut"] = tool.get("shortcut", "")
             return tool
 
         return [_init_tool(tool) for tool in self._cfg.get("repo_commands", [])]

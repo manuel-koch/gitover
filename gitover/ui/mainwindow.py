@@ -35,7 +35,7 @@ import gitover.ui.resources  # Only need this to get access to embedded Qt resou
 from gitover.repos_model import ReposModel, Repo, ChangedFilesModel
 from gitover.res_helper import getResourceUrl
 
-__version__ = "0.8.8"
+__version__ = "0.9.0"
 
 LOGGER = logging.getLogger(__name__)
 

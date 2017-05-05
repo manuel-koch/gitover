@@ -48,51 +48,9 @@ Rectangle {
 
     MouseArea {
         anchors.fill: parent
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onClicked: {
-            if( mouse.button == Qt.RightButton ) {
-                theMenu.fillMenu()
-                theMenu.popup()
-            }
-            else {
-                root.clicked()
-            }
-        }
+        acceptedButtons: Qt.LeftButton
+        onClicked: root.clicked()
         onDoubleClicked: repository.triggerUpdate()
-    }
-
-    Menu {
-        id: theMenu
-
-        property var dynMenuItems: [] // array of dynamically created MenuItem instances
-
-        function clearMenu() {
-            while(dynMenuItems.length) {
-                var item = dynMenuItems.pop()
-                theMenu.removeItem(item)
-                item.destroy()
-            }
-        }
-
-        function fillMenu() {
-            clearMenu()
-            var cmds = repository.cmds()
-            for(var i=0; i<cmds.length; i++) {
-                var newMenuItem
-                if( cmds[i].title ) {
-                    console.debug("Creating menu '"+cmds[i].title+"' for",repository.name)
-                    newMenuItem = Qt.createQmlObject('import QtQuick.Controls 1.4; MenuItem {text: "'+cmds[i].title+'"; onTriggered: repository.execCmd("'+cmds[i].name+'")}',
-                                                     theMenu, "dynamicMenuItem"+i);
-                }
-                else {
-                    console.debug("Creating menu separator")
-                    newMenuItem = Qt.createQmlObject('import QtQuick.Controls 1.4; MenuSeparator {}',
-                                                     theMenu, "dynamicMenuItem"+i);
-                }
-                theMenu.insertItem(i,newMenuItem)
-                dynMenuItems.push(newMenuItem)
-            }
-        }
     }
 
     QtObject {

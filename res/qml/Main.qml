@@ -29,6 +29,7 @@ ApplicationWindow {
     visible: true
 
     menuBar: MenuBar {
+        id: theMenuBar
         Menu {
             title: "File"
             MenuItem {
@@ -49,14 +50,18 @@ ApplicationWindow {
             title: "Repos"
             MenuItem {
                 text: "Update status"
-                shortcut: "Ctrl+R"
+                shortcut: "Alt+R"
                 onTriggered: globalRepositories.triggerUpdate()
             }
             MenuItem {
                 text: "Fetch"
-                shortcut: "Ctrl+F"
+                shortcut: "Alt+F"
                 onTriggered: globalRepositories.triggerFetch()
             }
+        }
+        RepoMenu {
+            id: theRepoMenu
+            visible: repository != null
         }
     }
 
@@ -119,6 +124,7 @@ ApplicationWindow {
             onCurrentIndexChanged: {
                 console.debug("currentIndex",currentIndex)
                 theRepoGrid.repository = (currentIndex != -1) ? globalRepositories.repo( currentIndex ) : null
+                theRepoMenu.repository = theRepoGrid.repository
             }
 
             onCountChanged: currentIndex = -1

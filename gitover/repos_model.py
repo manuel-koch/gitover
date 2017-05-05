@@ -295,7 +295,7 @@ class GitStatus(object):
             trackedBranches = [self._trackingBranch(repo, b) for b in self.branches]
             remoteBranches = [r.name for r in repo.references
                               if isinstance(r, git.RemoteReference) and
-                              r.name != (r.remote_name+"/HEAD") and
+                              r.name != (r.remote_name + "/HEAD") and
                               r.name not in trackedBranches]
             remoteBranches.sort(key=str.lower)
             self.remoteBranches = remoteBranches
@@ -1234,31 +1234,31 @@ class Repo(QObject, QmlTypeMixin):
         """Executes a named command for current repository"""
         cfg = self._config()
 
-        if name == "update":
+        if name == "__update":
             self.triggerUpdate()
             return
-        if name == "fetch":
+        if name == "__fetch":
             self.triggerFetch()
             return
-        if name == "pull":
+        if name == "__pull":
             self.triggerPull()
             return
-        if name == "push":
+        if name == "__push":
             self.triggerPush(self.branch, False)
             return
-        if name == "pushforced":
+        if name == "__pushforced":
             self.triggerPush(self.branch, True)
             return
-        if name == "rebasetrunk":
+        if name == "__rebasetrunk":
             self.triggerRebase(self._trunk_branch)
             return
-        if name == "rebasecont":
+        if name == "__rebasecont":
             self._rebaseWorker.cont.emit()
             return
-        if name == "rebaseskip":
+        if name == "__rebaseskip":
             self._rebaseWorker.skip.emit()
             return
-        if name == "rebaseabort":
+        if name == "__rebaseabort":
             self._rebaseWorker.abort.emit()
             return
 
@@ -1284,26 +1284,26 @@ class Repo(QObject, QmlTypeMixin):
     @pyqtSlot(result=QVariant)
     def cmds(self):
         """Returns a list of dict with keys name,title to configure commands for current repository"""
-        tools = [{"name": "update", "title": "Refresh"},
-                 {"name": "fetch", "title": "Fetch"},
-                 {"name": "pull", "title": "Pull"}]
+        cmds = [dict(name="__update", title="Refresh", shortcut="Ctrl+R"),
+                dict(name="__fetch", title="Fetch", shortcut="Ctrl+F"),
+                dict(name="__pull", title="Pull")]
         if not self._rebasing:
-            tools.append({"name": "rebasetrunk", "title": "Rebase onto trunk"})
+            cmds.append({"name": "__rebasetrunk", "title": "Rebase onto trunk"})
         else:
-            tools.append({"name": "rebasecont", "title": "Continue rebase"})
-            tools.append({"name": "rebaseskip", "title": "Skip rebase"})
-            tools.append({"name": "rebaseabort", "title": "Abort rebase"})
+            cmds.append({"name": "__rebasecont", "title": "Continue rebase"})
+            cmds.append({"name": "__rebaseskip", "title": "Skip rebase"})
+            cmds.append({"name": "__rebaseabort", "title": "Abort rebase"})
         if not self._tracking_branch or self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits:
-            tools.append({"name": "push", "title": "Push"})
+            cmds.append({"name": "__push", "title": "Push"})
         if self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits:
-            tools.append({"name": "pushforced", "title": "Push (force)"})
-        cfg = self._config()
-        cfgTools = cfg.tools()
-        if cfgTools:
-            tools.append({"title": ""})
-        tools += cfgTools
+            cmds.append({"name": "__pushforced", "title": "Push (force)"})
+        return QVariant(cmds)
 
-        return QVariant(tools)
+    @pyqtSlot(result=QVariant)
+    def toolCmds(self):
+        """Returns a list of dict with keys name,title to configure tool commands for current repository"""
+        cfg = self._config()
+        return QVariant(cfg.tools())
 
     @pyqtSlot(str, str, result=str)
     def diff(self, path, status):
