@@ -32,10 +32,10 @@ from PyQt5.QtQml import QQmlApplicationEngine
 from PyQt5.QtQuick import QQuickView
 
 import gitover.ui.resources  # Only need this to get access to embedded Qt resources
-from gitover.repos_model import ReposModel, Repo, ChangedFilesModel
+from gitover.repos_model import ReposModel, Repo, ChangedFilesModel, OutputModel
 from gitover.res_helper import getResourceUrl
 
-__version__ = "0.9.0"
+__version__ = "0.10.0"
 
 LOGGER = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ def run_gui(repo_paths, watch_filesystem):
     ReposModel.registerToQml()
     Repo.registerToQml()
     ChangedFilesModel.registerToQml()
+    OutputModel.registerToQml()
 
     settings = QSettings()
     settings.beginGroup("MainWindow")

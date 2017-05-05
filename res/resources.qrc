@@ -9,7 +9,7 @@
     <file>qml/LabelValueRow.qml</file>
     <file>qml/RepoActionBadge.qml</file>
     <file>qml/RepoMenu.qml</file>
-    <file>qml/RepoOutputList.qml</file>
+    <file>qml/RepoOutput.qml</file>
     <file>qml/RepoStatusDiff.qml</file>
     <file>qml/RepoStatusList.qml</file>
     <file>qml/RepoDetailView.qml</file>

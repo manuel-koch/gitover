@@ -73,7 +73,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         self._queued_path = []
         self._queueTimer = QTimer()
         self._queueTimer.setInterval(50)
-        self._queueTimer.timeout.connect( self._nextAddRepo )
+        self._queueTimer.timeout.connect(self._nextAddRepo)
 
         cfg = Config()
         cfg.load(os.path.expanduser("~"))
@@ -889,11 +889,16 @@ class ChangedFilesModel(QAbstractItemModel, QmlTypeMixin):
 OutputLine = NamedTuple("OutputLine", [("timestamp", str), ("line", str)])
 
 
-class OutputModel(QAbstractItemModel):
+class OutputModel(QAbstractItemModel, QmlTypeMixin):
     """Model of output lines"""
 
-    TIMESTAMP = Qt.UserRole + 1
-    LINE = Qt.UserRole + 2
+    class Role:
+        Timestamp = Qt.UserRole + 1
+        Line = Qt.UserRole + 2
+
+    Q_ENUMS(Role)
+
+    countChanged = pyqtSignal(int)
 
     def __init__(self, parent=None):
         """Construct changed files model"""
@@ -902,8 +907,8 @@ class OutputModel(QAbstractItemModel):
 
     def roleNames(self):
         roles = super().roleNames()
-        roles[OutputModel.TIMESTAMP] = b"timestamp"
-        roles[OutputModel.LINE] = b"line"
+        roles[OutputModel.Role.Timestamp] = b"timestamp"
+        roles[OutputModel.Role.Line] = b"line"
         return roles
 
     def index(self, row, col, parent=None):
@@ -911,6 +916,10 @@ class OutputModel(QAbstractItemModel):
 
     def rowCount(self, parent=None):
         return len(self._entries)
+
+    @pyqtProperty(int, notify=countChanged)
+    def count(self):
+        return self.rowCount()
 
     def columnCount(self, idx):
         return 1
@@ -922,9 +931,9 @@ class OutputModel(QAbstractItemModel):
         entry = self._entries[idx.row()]
         if role == Qt.DisplayRole:
             return entry.line
-        if role == OutputModel.TIMESTAMP:
+        if role == OutputModel.Role.Timestamp:
             return entry.timestamp
-        if role == OutputModel.LINE:
+        if role == OutputModel.Role.Line:
             return entry.line
 
         return None
@@ -935,12 +944,14 @@ class OutputModel(QAbstractItemModel):
         now = datetime.datetime.now().replace(microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
         self._entries.append(OutputLine(now, line))
         self.endInsertRows()
+        self.countChanged.emit(self.rowCount())
 
     @pyqtSlot()
     def clearOutput(self):
         self.beginResetModel()
         self._entries = []
         self.endResetModel()
+        self.countChanged.emit(self.rowCount())
 
 
 class Repo(QObject, QmlTypeMixin):

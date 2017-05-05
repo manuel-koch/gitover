@@ -174,7 +174,7 @@ ApplicationWindow {
             }
             Tab {
                 title: "Output"
-                RepoOutputList {
+                RepoOutput {
                     id: theRepoOutput
                     repository: theRepoGrid.repository
                     visible:    internal.hasRepos
