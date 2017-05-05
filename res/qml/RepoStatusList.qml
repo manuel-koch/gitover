@@ -53,7 +53,6 @@ Rectangle {
 
         function selectEntry(index) {
             currentIndex = index
-            console.log("currentIndex",currentIndex)
             if( currentIndex != -1) {
                 var idx = model.index(currentIndex,0)
                 root.currentPath = model.data(idx,ChangedFilesModel.Path)

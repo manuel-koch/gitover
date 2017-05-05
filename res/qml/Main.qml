@@ -122,7 +122,6 @@ ApplicationWindow {
             }
 
             onCurrentIndexChanged: {
-                console.debug("currentIndex",currentIndex)
                 theRepoGrid.repository = (currentIndex != -1) ? globalRepositories.repo( currentIndex ) : null
                 theRepoMenu.repository = theRepoGrid.repository
             }
