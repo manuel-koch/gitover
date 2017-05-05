@@ -37,7 +37,7 @@ import git
 from git.cmd import handle_process_output
 from git.util import finalize_process
 
-from PyQt5.QtCore import QModelIndex, pyqtSlot, Q_ENUMS
+from PyQt5.QtCore import QModelIndex, pyqtSlot, Q_ENUMS, QTimer
 from PyQt5.QtCore import QVariant
 from PyQt5.QtCore import Qt, pyqtProperty, pyqtSignal, QObject
 from PyQt5.QtCore import QAbstractItemModel
@@ -69,6 +69,11 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         self._fsWatcher.repoChanged.connect(self._onRepoChanged)
 
         self._repos = []
+
+        self._queued_path = []
+        self._queueTimer = QTimer()
+        self._queueTimer.setInterval(50)
+        self._queueTimer.timeout.connect( self._nextAddRepo )
 
         cfg = Config()
         cfg.load(os.path.expanduser("~"))
@@ -154,10 +159,12 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         if any([r.path == repo.path for r in self._repos]):
             return
 
+        import datetime
+        s = datetime.datetime.now()
+
         self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
         repo.setParent(self)
         self._repos += [repo]
-        LOGGER.debug("Added repo {}".format(repo))
         self.endInsertRows()
         self.nofReposChanged.emit(self.nofRepos)
 
@@ -166,10 +173,20 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         subpaths.sort(key=str.lower)
         for subpath in subpaths:
             name = subpath[len(rootpath) + 1:]
-            self.addRepo(Repo(subpath, name))
+            self._queued_path += [(subpath, name)]
 
         if self._watchFs:
             self._fsWatcher.track.emit(rootpath)
+
+        self._queueTimer.start()
+
+    def _nextAddRepo(self):
+        if not self._queued_path:
+            return
+        path, name = self._queued_path.pop(0)
+        repo = Repo(path, name)
+        self.addRepo(repo)
+        self._queueTimer.start()
 
     def _onRepoChanged(self, path):
         roots = [(repo.path, repo) for repo in self._repos]
