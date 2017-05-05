@@ -28,8 +28,9 @@ Item {
         id: theColors
         property color border:                "silver"
         property color selectedRepoBg:        "#E6E6D3"
-        property color statusRepoUpgradeable: "#097A09"
-        property color statusRepoModified:    "#D18DB3"
+        property color statusRepoUpgradeable: "#57C857"
+        property color statusRepoPushable:    "#432182"
+        property color statusRepoModified:    "#BFAC21"
         property color statusRepoError:       "#FE4E4E"
         property color statusAdded:           "#60DA60"
         property color statusStaged:          "#593896"
@@ -40,7 +41,7 @@ Item {
         property color statusHeaderBg:        "#ECECEC"
         property color statusSectionBg:       "#ACDBDD"
         property color branchAhead:           "#57C857"
-        property color branchBehind:          "#BF2121"
+        property color branchBehind:          "#432182"
 
         property color badgeText:     "white"
         property color badgeError:    "#BF2121"

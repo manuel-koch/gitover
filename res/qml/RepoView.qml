@@ -26,9 +26,8 @@ Rectangle {
 
     height:        theColumn.implicitHeight + 2*radius
     radius:        4
-    border.width:  internal.hasChanges || internal.canUpgrade ? 2 : 1
-    border.color:  internal.hasChanges ? Theme.colors.statusRepoModified
-                       : (internal.canUpgrade ? Theme.colors.statusRepoUpgradeable : Theme.colors.border)
+    border.width:  2
+    border.color:  Theme.colors.border
     color:         "transparent"
     clip:          true
 
@@ -104,6 +103,7 @@ Rectangle {
 
         property bool hasChanges: untracked || modified || deleted || conflicts || staged
         property bool canUpgrade: root.repository && root.repository.trunkBranchAhead
+        property bool canPush:    root.repository && root.repository.trackingBranchBehind
         property int untracked:   root.repository ? root.repository.untracked : 0
         property int modified:    root.repository ? root.repository.modified : 0
         property int deleted:     root.repository ? root.repository.deleted : 0
@@ -111,6 +111,8 @@ Rectangle {
         property int staged:      root.repository ? root.repository.staged : 0
 
         property string changeSummary: getChangeSummary(modified,deleted,untracked,conflicts,staged)
+
+        property var statusColors: getStatusColors(hasChanges,canUpgrade)
 
         function getChangeSummary(m,d,u,c,s) {
             var t = []
@@ -128,12 +130,30 @@ Rectangle {
                 t.push("<font color='#03C003'>up-to-date</font>")
             return t.join(", ")
         }
+
+        function getStatusColors() {
+            var colors = Array()
+            if( hasChanges )
+                colors.push(Theme.colors.statusRepoModified)
+            if( canUpgrade )
+                colors.push(Theme.colors.statusRepoUpgradeable)
+            if( canPush )
+                colors.push(Theme.colors.statusRepoPushable)
+            return colors
+        }
+    }
+
+    GradientBorder {
+        id: theStatusBorder
+        anchors.fill: root
+        borderWidth:  root.border.width+2
+        colors:       internal.statusColors
     }
 
     Column {
         id: theColumn
         anchors.fill:     parent
-        anchors.margins:  root.radius
+        anchors.margins:  theStatusBorder.borderWidth+2
         spacing:          2
 
         RowLayout {
