@@ -54,11 +54,12 @@ Item {
 
         function useBranches(branch,branches) {
             var b = [branch]
-            if( branches.length > 1 )
-                b.push("---")
             for( var i=0; i<branches.length; i++ ) {
-                if( b.indexOf(branches[i]) == -1 )
+                if( b.indexOf(branches[i]) == -1 ) {
+                    if( b.length == 1 )
+                        b.push("---")
                     b.push( branches[i] )
+                }
             }
             theCombo.model = b
             theCombo.currentIndex = 0

@@ -1314,18 +1314,22 @@ class Repo(QObject, QmlTypeMixin):
     def cmds(self):
         """Returns a list of dict with keys name,title to configure commands for current repository"""
         cmds = [dict(name="__update", title="Refresh", shortcut="Ctrl+R"),
-                dict(name="__fetch", title="Fetch", shortcut="Ctrl+F"),
-                dict(name="__pull", title="Pull")]
+                dict(name="__fetch", title="Fetch", shortcut="Ctrl+F")]
+        branchValid = self._branch in self._branches
+        if branchValid:
+            cmds.append(dict(name="__pull", title="Pull"))
         if not self._rebasing:
-            cmds.append({"name": "__rebasetrunk", "title": "Rebase onto trunk"})
+            cmds.append(dict(name="__rebasetrunk", title="Rebase onto trunk"))
         else:
-            cmds.append({"name": "__rebasecont", "title": "Continue rebase"})
-            cmds.append({"name": "__rebaseskip", "title": "Skip rebase"})
-            cmds.append({"name": "__rebaseabort", "title": "Abort rebase"})
-        if not self._tracking_branch or self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits:
-            cmds.append({"name": "__push", "title": "Push"})
-        if self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits:
-            cmds.append({"name": "__pushforced", "title": "Push (force)"})
+            cmds.append(dict(name="__rebasecont", title="Continue rebase"))
+            cmds.append(dict(name="__rebaseskip", title="Skip rebase"))
+            cmds.append(dict(name="__rebaseabort", title="Abort rebase"))
+        if branchValid:
+            updatedTrackingBranch = self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits
+            if not self._tracking_branch or updatedTrackingBranch:
+                cmds.append(dict(name="__push", title="Push"))
+            if updatedTrackingBranch:
+                cmds.append(dict(name="__pushforced", title="Push (force)"))
         return QVariant(cmds)
 
     @pyqtSlot(result=QVariant)
