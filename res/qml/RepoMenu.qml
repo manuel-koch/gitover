@@ -26,6 +26,7 @@ Menu {
     title: repository != null ? repository.name : ""
 
     property Repo repository: null
+    property bool shortcutsEnabled: true
 
     function fillMenu() {
         internal.commands = theMenu.repository ? theMenu.repository.cmds() : null
@@ -49,7 +50,7 @@ Menu {
         model: internal.commands
         MenuItem {
             text: internal.commands && index < internal.commands.length && internal.commands[index] ? internal.commands[index].title : ""
-            shortcut: internal.commands && index < internal.commands.length && internal.commands[index] ? internal.commands[index].shortcut : ""
+            shortcut: theMenu.shortcutsEnabled && internal.commands && index < internal.commands.length && internal.commands[index] ? internal.commands[index].shortcut : ""
             onTriggered: repository.execCmd(internal.commands[index].name)
         }
         onObjectAdded: theMenu.insertItem(index, object)
@@ -64,7 +65,7 @@ Menu {
         model: internal.tools
         MenuItem {
             text: internal.tools && index < internal.tools.length && internal.tools[index] ? internal.tools[index].title : ""
-            shortcut: internal.tools && index < internal.tools.length && internal.tools[index] ? internal.tools[index].shortcut : ""
+            shortcut: theMenu.shortcutsEnabled && internal.tools && index < internal.tools.length && internal.tools[index] ? internal.tools[index].shortcut : ""
             onTriggered: repository.execCmd(internal.tools[index].name)
         }
         onObjectAdded: theMenu.insertItem(index, object)

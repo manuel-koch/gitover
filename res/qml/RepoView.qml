@@ -48,9 +48,21 @@ Rectangle {
 
     MouseArea {
         anchors.fill: parent
-        acceptedButtons: Qt.LeftButton
-        onClicked: root.clicked()
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: {
+            root.clicked()
+            if( mouse.button == Qt.RightButton ) {
+                theMenu.fillMenu()
+                theMenu.popup()
+            }
+        }
         onDoubleClicked: repository.triggerUpdate()
+    }
+
+    RepoMenu {
+        id: theMenu
+        repository:       root.repository
+        shortcutsEnabled: false
     }
 
     QtObject {
