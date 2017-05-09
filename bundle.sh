@@ -13,7 +13,9 @@ echo QT5DIR=${QT5DIR}
 # $ env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install 3.5.3
 # See https://github.com/pyinstaller/pyinstaller/wiki/Development
 #
-pyinstaller --icon $(dirname $0)/res/icon.icns --log-level=DEBUG --debug --onefile --windowed --noconfirm --clean -n GitOver --paths $(dirname $0) $(dirname $0)/gitover/main.py
+# Extended debug while building/running application:
+# --log-level=DEBUG --debug
+pyinstaller --icon $(dirname $0)/res/icon.icns --onefile --windowed --noconfirm --clean -n GitOver --paths $(dirname $0) $(dirname $0)/gitover/main.py
 
 # Add support for high DPI aka retina displays
 INFO_PLIST=$(dirname $0)/dist/GitOVer.app/Contents/info.plist
