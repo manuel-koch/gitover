@@ -24,7 +24,8 @@ import "."
 Rectangle {
     id: root
 
-    height:        theColumn.implicitHeight + 2*radius
+    implicitHeight: theColumn.implicitHeight + 4*radius
+
     radius:        4
     border.width:  2
     border.color:  Theme.colors.border

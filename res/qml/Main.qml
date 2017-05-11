@@ -92,17 +92,20 @@ ApplicationWindow {
 
         GridView {
             id: theRepoGrid
-            Layout.minimumHeight: 200
+            Layout.minimumHeight: minCellHeight*cellsPerCol
             Layout.fillHeight:    true
             clip:                 true
-            cellWidth:            width / cellsPerRow
-            cellHeight:           height / Math.ceil(count/cellsPerRow)
+            cellWidth:            calcCellWidth(cellsPerRow)
+            cellHeight:           calcCellHeight(cellsPerRow)
             snapMode:             GridView.SnapToRow
             boundsBehavior:       Flickable.StopAtBounds
             visible:              internal.hasRepos
 
             property int cellSpacing: 2
-            property int cellsPerRow: Math.min(count,5)
+            property int cellsPerRow: 1
+            property int cellsPerCol: Math.ceil(count/cellsPerRow)
+            property var minCellHeights: []
+            property real minCellHeight: 1e6
             property Repo repository: null
 
             model: globalRepositories
@@ -119,6 +122,7 @@ ApplicationWindow {
                 property int  row:          Math.floor( index / theRepoGrid.cellsPerRow )
                 property bool isLastColumn: (column+1) == theRepoGrid.cellsPerRow
                 property bool isLastRow:    row == Math.floor(theRepoGrid.count / theRepoGrid.cellsPerRow)
+                onImplicitHeightChanged:    theRepoGrid.updateMinCellHeight(index,implicitHeight)
             }
 
             onCurrentIndexChanged: {
@@ -126,7 +130,57 @@ ApplicationWindow {
                 theRepoMenu.repository = theRepoGrid.repository
             }
 
-            onCountChanged: currentIndex = -1
+            onCountChanged: {
+                currentIndex = -1
+                findBestLayout()
+            }
+
+            onWidthChanged:         theRelayoutTimer.restart()
+            onHeightChanged:        theRelayoutTimer.restart()
+            onMinCellHeightChanged: theRelayoutTimer.restart()
+
+            Timer {
+                id: theRelayoutTimer
+                interval:    300
+                onTriggered: theRepoGrid.findBestLayout()
+            }
+
+            function updateMinCellHeight(idx,height) {
+                while( minCellHeights.length <= idx )
+                    minCellHeights.push(1e6)
+                minCellHeights[idx] = height
+                var min = 1e6
+                for( var i=0; i<minCellHeights.length; i++ )
+                    min = Math.min(min,minCellHeights[i])
+                minCellHeight = min
+            }
+
+            function calcCellWidth(cols) {
+                return width / cols
+            }
+
+            function calcCellHeight(cols) {
+                return height / Math.ceil(count/cols)
+            }
+
+            function findBestLayout() {
+                var dims = Array()
+                for( var cols=1; cols<=count; cols++ ) {
+                    var w = calcCellWidth(cols)
+                    var h = calcCellHeight(cols)
+                    if( w > minCellHeight*2 && h > minCellHeight ) {
+                        dims.push({"cols": cols, "width": w, "height": h})
+                    }
+                }
+
+                // sort by ascending area
+                dims.sort(function(a,b) { return (b.width*b.height) - (a.width*a.height) })
+
+                if( dims.length ) {
+                    // pick the layout with the greatest area per cell
+                    theRepoGrid.cellsPerRow = dims[0].cols
+                }
+            }
         }
 
         TabView {
