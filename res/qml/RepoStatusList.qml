@@ -90,7 +90,7 @@ Rectangle {
             Text {
                 id: theSectionText
                 text:           section
-                font.pointSize: 10
+                font.pointSize: Theme.fonts.smallPointSize
                 leftPadding:    2
             }
         }
@@ -107,7 +107,7 @@ Rectangle {
             height: childrenRect.height
             Text {
                 text:           path
-                font.pointSize: 10
+                font.pointSize: Theme.fonts.smallPointSize
             }
             MouseArea {
                 anchors.fill: parent

@@ -43,26 +43,24 @@ Rectangle {
         onStatusUpdated: theDiff.updateDiff()
     }
 
-    Flickable {
-        id: theFlickable
-        anchors.fill:    root
-        anchors.margins: 2
-        contentWidth:    theDiff.implicitWidth
-        contentHeight:   theDiff.implicitHeight
-        boundsBehavior:  Flickable.StopAtBounds
+    TextArea {
+        id: theDiff
+        anchors.fill:     parent
+        readOnly:         true
+        wrapMode:         TextEdit.NoWrap
+        textFormat:       TextEdit.PlainText
+        font.family:      "courier"
+        selectByKeyboard: true
+        selectByMouse:    true
 
-        Text {
-            id: theDiff
-            font.family: "courier"
+        onTextChanged: {
+            // scroll to top
+            flickableItem.contentX = 0
+            flickableItem.contentY = 0
+        }
 
-            onTextChanged: {
-                theFlickable.contentX = 0
-                theFlickable.contentY = 0
-            }
-
-            function updateDiff() {
-                text = (root.repository !== null ? root.repository.diff(path,status) : "")
-            }
+        function updateDiff() {
+            text = (root.repository !== null ? root.repository.diff(path,status) : "")
         }
     }
 }
