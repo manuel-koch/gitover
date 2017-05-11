@@ -22,6 +22,7 @@ Item {
     id: root
 
     property QtObject colors: theColors
+    property QtObject fonts:  theFonts
 
     // Base Color: 36B036 : http://paletton.com/#uid=72P1z0kmbrBcHF-i0vkqun+tEj5
     QtObject {
@@ -51,6 +52,11 @@ Item {
         property color badgeCheckout: "#A41C53"
         property color badgeRebase:   "#BD3A6F"
         property color badgePush:     "#432182"
+    }
+
+    QtObject {
+        id: theFonts
+        property int smallPointSize: 11
     }
 
     function colorValToHex(v) {

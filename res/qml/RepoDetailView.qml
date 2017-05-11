@@ -19,6 +19,7 @@ import QtQuick 2.6
 import QtQuick.Layouts 1.2
 import QtQuick.Controls 1.4
 import Gitover 1.0
+import "."
 
 Rectangle {
     id: root
@@ -47,11 +48,11 @@ Rectangle {
                 font.bold:        true
                 font.pointSize:   14
             }
-            Text {
+            SelectableTextline {
                 Layout.fillWidth: true
                 text:             (root.repository !== null) ? repository.path : ""
                 leftPadding:      10
-                font.pointSize:   10
+                font.pointSize:   Theme.fonts.smallPointSize
             }
             Text {
                 Layout.fillWidth: true
@@ -60,13 +61,15 @@ Rectangle {
                 visible:          root.repository !== null
             }
             Repeater {
-                Layout.fillWidth: true
-                model:            repository != null ? repository.branches : null
-                Text {
+                Layout.fillWidth:  true
+                model:             repository != null ? repository.branches : null
+                SelectableTextline {
                     property bool obsolete: root.repository !== null && repository.mergedToTrunkBranches.indexOf(modelData)!=-1
-                    text:           modelData + (obsolete ? " --> <i>(obsolete: already merged to trunk)</i>" : "")
+                    width:          parent.width
+                    text:           modelData
+                    label:          (obsolete ? "--> <i>(obsolete: already merged to trunk)</i>" : "")
+                    font.pointSize: Theme.fonts.smallPointSize
                     leftPadding:    10
-                    font.pointSize: 10
                 }
             }
             Text {
@@ -78,10 +81,12 @@ Rectangle {
             Repeater {
                 Layout.fillWidth: true
                 model:            repository != null ? repository.remoteBranches : null
-                Text {
-                    text:           modelData + " --> <a href='checkout'>checkout</a>"
-                    leftPadding:    10
-                    font.pointSize: 10
+                SelectableTextline {
+                    width:           parent.width
+                    text:            modelData
+                    label:           "--> <a href='checkout'>checkout</a>"
+                    font.pointSize:  Theme.fonts.smallPointSize
+                    leftPadding:     10
                     onLinkActivated: repository.triggerCheckoutBranch(modelData)
                 }
             }

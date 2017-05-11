@@ -57,25 +57,23 @@ Item {
                     width:  root.width
                     height: theRev.height
 
-                    Text {
+                    SelectableTextline {
                         id: theRev
                         Layout.leftMargin:     10
                         Layout.preferredWidth: 60
                         text:                  details.rev
                         font.family:           "monospace"
-                        font.pointSize:        10
+                        font.pointSize:        Theme.fonts.smallPointSize
                     }
-                    Text {
-                        Layout.preferredWidth: 100
+                    SelectableTextline {
+                        Layout.preferredWidth: 120
                         text:                  details.user
-                        font.pointSize:        10
-                        elide:                 Text.ElideRight
+                        font.pointSize:        Theme.fonts.smallPointSize
                     }
-                    Text {
+                    SelectableTextline {
                         Layout.fillWidth: true
                         text:             details.msg
-                        font.pointSize:   10
-                        elide:            Text.ElideRight
+                        font.pointSize:   Theme.fonts.smallPointSize
                     }
                 }
                 Repeater {
@@ -87,18 +85,17 @@ Item {
 
                         Text {
                             id: theChange
-                            Layout.leftMargin:     170 + 2*theCommitRow.spacing
+                            Layout.leftMargin:     190 + 2*theCommitRow.spacing
                             Layout.preferredWidth: 12
                             text:                  modelData.change
                             font.family:           "monospace"
-                            font.pointSize:        10
+                            font.pointSize:        Theme.fonts.smallPointSize
                             color:                 Theme.changeTypeToColor(text)
                         }
-                        Text {
+                        SelectableTextline {
                             Layout.fillWidth: true
                             text:             modelData.path
-                            font.pointSize:   10
-                            elide:            Text.ElideRight
+                            font.pointSize:   Theme.fonts.smallPointSize
                         }
                     }
                 }

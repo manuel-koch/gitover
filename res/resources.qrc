@@ -14,6 +14,7 @@
     <file>qml/RepoStatusList.qml</file>
     <file>qml/RepoDetailView.qml</file>
     <file>qml/RepoView.qml</file>
+    <file>qml/SelectableTextline.qml</file>
     <file>qml/SelectDirectoryDialog.qml</file>
     <file>qml/Theme.qml</file>
     <file>icon.png</file>
