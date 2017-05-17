@@ -63,4 +63,8 @@ Rectangle {
             text = (root.repository !== null ? root.repository.diff(path,status) : "")
         }
     }
+
+    GitDiffFormatter {
+        textDocument: (status=="modified" || status=="staged" || status=="conflict") ? theDiff.textDocument : null
+    }
 }
