@@ -245,6 +245,7 @@ class GitStatus(object):
     def __init__(self, path):
         self.path = path  # root directory of repository
         self.branch = ""  # current branch
+        self.detached = False
         self.branches = []  # all local branches
         self.remoteBranches = []  # all remote branches that could be checked-out
         self.mergedToTrunkBranches = []  # all local branches that have been merged to trunk
@@ -298,6 +299,7 @@ class GitStatus(object):
             if repo.head and repo.head.commit:
                 head = repo.git.rev_parse(repo.head.commit.hexsha, short=8)
                 self.branch = "detached {}".format(head)
+                self.detached = True
             else:
                 self.branch = ""
 
@@ -961,6 +963,7 @@ class Repo(QObject, QmlTypeMixin):
     nameChanged = pyqtSignal(str)
 
     branchChanged = pyqtSignal(str)
+    detachedChanged = pyqtSignal(bool)
     branchesChanged = pyqtSignal("QStringList")
     remoteBranchesChanged = pyqtSignal("QStringList")
     mergedToTrunkBranchesChanged = pyqtSignal("QStringList")
@@ -1044,6 +1047,7 @@ class Repo(QObject, QmlTypeMixin):
         self._pushWorker.error.connect(self.error)
 
         self._branch = ""
+        self._detached = False
         self._branches = []
         self._remote_branches = []
         self._merged_to_trunk_branches = []
@@ -1229,6 +1233,7 @@ class Repo(QObject, QmlTypeMixin):
             return l
 
         self.branch = status.branch
+        self.detached = status.detached
         self.branches = sorteditems(status.branches)
         self.remoteBranches = sorteditems(status.remoteBranches)
         self.mergedToTrunkBranches = sorteditems(status.mergedToTrunkBranches)
@@ -1392,6 +1397,16 @@ class Repo(QObject, QmlTypeMixin):
         if self._branch != branch:
             self._branch = branch
             self.branchChanged.emit(self._branch)
+
+    @pyqtProperty(bool, notify=detachedChanged)
+    def detached(self):
+        return self._detached
+
+    @detached.setter
+    def detached(self, detached):
+        if self._detached != detached:
+            self._detached = detached
+            self.detachedChanged.emit(self._detached)
 
     @pyqtProperty(str, notify=trackingBranchChanged)
     def trackingBranch(self):

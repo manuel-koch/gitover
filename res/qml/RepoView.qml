@@ -75,6 +75,7 @@ Rectangle {
         property bool hasChanges: untracked || modified || deleted || conflicts || staged
         property bool canUpgrade: root.repository && root.repository.trunkBranchAhead
         property bool canPush:    root.repository && root.repository.trackingBranchBehind
+        property bool isDetached: root.repository && root.repository.detached
         property int untracked:   root.repository ? root.repository.untracked : 0
         property int modified:    root.repository ? root.repository.modified : 0
         property int deleted:     root.repository ? root.repository.deleted : 0
@@ -110,6 +111,8 @@ Rectangle {
                 colors.push(Theme.colors.statusRepoUpgradeable)
             if( canPush )
                 colors.push(Theme.colors.statusRepoPushable)
+            if( isDetached )
+                colors.push(Theme.colors.statusRepoDetached)
             return colors
         }
     }

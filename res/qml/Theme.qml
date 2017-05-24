@@ -32,6 +32,7 @@ Item {
         property color statusRepoUpgradeable: "#57C857"
         property color statusRepoPushable:    "#432182"
         property color statusRepoModified:    "#BFAC21"
+        property color statusRepoDetached:    "#FA6D6D"
         property color statusRepoError:       "#FE4E4E"
         property color statusAdded:           "#60DA60"
         property color statusStaged:          "#593896"
