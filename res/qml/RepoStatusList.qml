@@ -34,6 +34,13 @@ Rectangle {
     property string currentPath: ""
     property string currentStatus: ""
 
+    RepoStatusMenu {
+        id: theMenu
+        repository:  root.repository
+        path:        currentPath
+        status:      currentStatus
+    }
+
     ListView {
         id: theList
         anchors.fill:             parent
@@ -110,8 +117,16 @@ Rectangle {
                 font.pointSize: Theme.fonts.smallPointSize
             }
             MouseArea {
-                anchors.fill: parent
-                onClicked:    theList.selectEntry(index)
+                anchors.fill:    parent
+                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                onClicked: {
+                    theList.selectEntry(index)
+                    if( mouse.button == Qt.RightButton ) {
+                        theMenu.status = status
+                        theMenu.path = path
+                        theMenu.popup()
+                    }
+                }
             }
         }
     }

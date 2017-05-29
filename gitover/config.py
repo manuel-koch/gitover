@@ -45,24 +45,44 @@ class Config(object):
         general["git"] = general.get("git", "")
         return general
 
+    def _init_tool(self, tool):
+        cmd = tool.get("cmd")
+        if cmd:
+            tool["name"] = tool.get("name", cmd.split()[0])
+            tool["title"] = tool.get("title", cmd.split()[0])
+            tool["shortcut"] = tool.get("shortcut", "")
+        return tool
+
     def tools(self):
-        """Returns list of tools, where each entry is dict with keys name, title"""
+        """Returns list of tools, where each entry is dict with keys name, title and shortcut."""
+        return [self._init_tool(tool) for tool in self._cfg.get("repo_commands", [])]
 
-        def _init_tool(tool):
-            cmd = tool.get("cmd")
-            if cmd:
-                tool["name"] = tool.get("name", cmd.split()[0])
-                tool["title"] = tool.get("title", cmd.split()[0])
-                tool["shortcut"] = tool.get("shortcut", "")
-            return tool
-
-        return [_init_tool(tool) for tool in self._cfg.get("repo_commands", [])]
+    def statusTools(self, status):
+        """
+        Returns list of status tools, where each entry is dict with keys name, title
+        and shortcut.
+        """
+        return [self._init_tool(tool) for tool in
+                self._cfg.get("status_commands", {}).get(status, [])]
 
     def tool(self, name):
-        """Returns detail configuration of named tool or None.
-        Returns tool configuration as dict with keys name, title, cmd."""
+        """
+        Returns detail configuration of named tool or None.
+        Returns tool configuration as dict with keys name, title, cmd and shortcut.
+        """
         tools = [tool for tool in self.tools() if tool["name"] == name]
         if not tools:
             LOGGER.error("Unknown tool {}".format(name))
+            return None
+        return tools[0]
+
+    def statusTool(self, status, name):
+        """
+        Returns detail configuration of named status tool or None.
+        Returns tool configuration as dict with keys name, title, cmd and shortcut.
+        """
+        tools = [tool for tool in self.statusTools(status) if tool["name"] == name]
+        if not tools:
+            LOGGER.error("Unknown status {} tool {}".format(status, name))
             return None
         return tools[0]

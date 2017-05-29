@@ -536,6 +536,9 @@ class GitCheckoutWorker(QObject):
     # signal gets emitted to trigger checkout given repo branch
     checkoutBranch = pyqtSignal(str)
 
+    # signal gets emitted to trigger checkout given path in repo
+    checkoutPath = pyqtSignal(str)
+
     # signal gets emitted when starting/stopping pull action
     checkoutprogress = pyqtSignal(bool)
 
@@ -549,6 +552,7 @@ class GitCheckoutWorker(QObject):
         super().__init__()
         self._path = path
         self.checkoutBranch.connect(self._onCheckoutBranch)
+        self.checkoutPath.connect(self._onCheckoutPath)
 
     @pyqtSlot(str)
     def _onCheckoutBranch(self, branch):
@@ -589,6 +593,26 @@ class GitCheckoutWorker(QObject):
 
         except:
             LOGGER.exception("Failed to checkout git repo at {}".format(self._path))
+            self.error.emit("Failed to " + err_hint)
+        finally:
+            self.checkoutprogress.emit(False)
+
+    @pyqtSlot(str)
+    def _onCheckoutPath(self, path):
+        """Checkout selected path reverting any local changes"""
+        try:
+            if not path:
+                return
+
+            self.checkoutprogress.emit(True)
+            repo = git.Repo(self._path)
+
+            err_hint = "checkout"
+            proc = repo.git.checkout("--", path, force=True,
+                                     with_extended_output=True, as_process=True)
+            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+        except:
+            LOGGER.exception("Failed to checkout {} in git repo at {}".format(path, self._path))
             self.error.emit("Failed to " + err_hint)
         finally:
             self.checkoutprogress.emit(False)
@@ -1295,25 +1319,53 @@ class Repo(QObject, QmlTypeMixin):
         if name == "__rebaseabort":
             self._rebaseWorker.abort.emit()
             return
+        if name == "__revert":
+            self._checkoutWorker.checkoutPath.emit(arg)
+            return
 
         tool = cfg.tool(name)
         if not tool:
             return
 
+        self._execCustomCmd(name, tool["cmd"])
+
+    @pyqtSlot(str, str, str)
+    def execStatusCmd(self, name, status, path):
+        """Executes a named status command for current repository"""
+        cfg = self._config()
+
+        if name == "__revert":
+            self._checkoutWorker.checkoutPath.emit(path)
+            return
+        if name == "__discard":
+            os.unlink(os.path.join(self._path, path))
+            return
+
+        tool = cfg.statusTool(status, name)
+        if not tool:
+            return
+
+        self._execCustomCmd(name, tool["cmd"], path=path)
+
+    def _execCustomCmd(self, name, cmd, **vars):
         def substVar(txt, variables):
             """Substite named variables in given string"""
             for name, value in variables.items():
                 txt = txt.replace("{{{}}}".format(name), value)
             return txt
 
-        vars = {"root": self._path,
-                "branch": self._branch,
-                "trackingbranch": self._tracking_branch,
-                "trunkbranch": self._trunk_branch}
-        cmd = substVar(tool["cmd"], vars)
+        vars.update({"root": self._path,
+                     "branch": self._branch,
+                     "trackingbranch": self._tracking_branch,
+                     "trunkbranch": self._trunk_branch})
+        cmd = substVar(cmd, vars)
+        exe = cmd.split()[0]
+        if exe == "git" and exe != git.Git.GIT_PYTHON_GIT_EXECUTABLE:
+            cmd = git.Git.GIT_PYTHON_GIT_EXECUTABLE + cmd[3:]
         cwd = self._path
         LOGGER.info("Executing command {}:\n\tCommand: {}\n\tCwd: {}".format(name, cmd, cwd))
-        subprocess.Popen(cmd, shell=True, cwd=cwd, executable="/bin/bash")
+        subprocess.Popen(cmd, shell=True, cwd=cwd, stdin=subprocess.DEVNULL,
+                         executable="/bin/bash")
 
     @pyqtSlot(result=QVariant)
     def cmds(self):
@@ -1339,9 +1391,33 @@ class Repo(QObject, QmlTypeMixin):
 
     @pyqtSlot(result=QVariant)
     def toolCmds(self):
-        """Returns a list of dict with keys name,title to configure tool commands for current repository"""
+        """
+        Returns a list of dict with keys name,title to configure tool commands for current repository
+        """
         cfg = self._config()
         return QVariant(cfg.tools())
+
+    @pyqtSlot(str, result=QVariant)
+    def statusCmds(self, status):
+        """
+        Returns a list of dict with keys name,title to configure commands for file(s)
+        of selected status in current repository
+        """
+        cmds = []
+        if status == "modified":
+            cmds += [dict(name="__revert", title="Revert")]
+        if status == "untracked":
+            cmds += [dict(name="__discard", title="Discard")]
+        return QVariant(cmds)
+
+    @pyqtSlot(str, result=QVariant)
+    def statusToolCmds(self, status):
+        """
+        Returns a list of dict with keys name,title to configure tool commands for file(s)
+        of selected status in current repository
+        """
+        cfg = self._config()
+        return QVariant(cfg.statusTools(status))
 
     @pyqtSlot(str, str, result=str)
     def diff(self, path, status):

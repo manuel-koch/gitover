@@ -53,6 +53,11 @@ repo_commands:
     - name:  gitgui
       title: "Git Gui"
       cmd:   "/usr/local/bin/git gui"
+status_commands:
+  conflict:
+    - name:  "mergetool_bc"
+      title: "Merge (bc)"
+      cmd:   "git mergetool --tool=beyondcompare -y '{path}'"
 ```
 
 ### Section `general`
@@ -76,6 +81,17 @@ The `cmd` argument supports expansion of repository depending strings :
 * `{branch}` will get expanded to current repository's branch
 * `{trackingbranch}` will get expanded to current repository's tracking branch
 * `{trunkbranch}` will get expanded to current repository's trunk branch
+
+### Section `status_commands`
+
+Can contain a list of repository commands/tools for each status 
+that will be shown when opening context menu within the status tab
+of currently selected repository-detail area.
+
+The `cmd` argument supports same expansion of repository depending strings
+as `repo_commands` and additionally :
+
+* `{path}` will get expanded to relative path within current repository
 
 ## GitOver's notion of _trunk_ branch
 

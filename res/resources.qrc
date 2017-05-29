@@ -12,6 +12,7 @@
     <file>qml/RepoOutput.qml</file>
     <file>qml/RepoStatusDiff.qml</file>
     <file>qml/RepoStatusList.qml</file>
+    <file>qml/RepoStatusMenu.qml</file>
     <file>qml/RepoDetailView.qml</file>
     <file>qml/RepoView.qml</file>
     <file>qml/SelectableTextline.qml</file>
