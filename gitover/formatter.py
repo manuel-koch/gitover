@@ -95,6 +95,8 @@ class GitDiffFormatter(QObject, QmlTypeMixin):
 
     def _setTabWidth(self):
         """Set tab width for document based on current font"""
+        if not self._txtdoc:
+            return
         spaces = " " * 4
         metrics = QFontMetrics(self._txtdoc.defaultFont())
         tabWidth = metrics.width(spaces);
@@ -106,6 +108,6 @@ class GitDiffFormatter(QObject, QmlTypeMixin):
     def textDocument(self, doc):
         if self._doc != doc:
             self._doc = doc
-            self._txtdoc = self._doc.textDocument()
-            self._highlighter = GitDiffHightlighter(self._txtdoc)
+            self._txtdoc = self._doc.textDocument() if self._doc else None
+            self._highlighter = GitDiffHightlighter(self._txtdoc) if self._txtdoc else None
             self._setTabWidth()
