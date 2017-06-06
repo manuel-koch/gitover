@@ -41,6 +41,11 @@ Rectangle {
         status:      currentStatus
     }
 
+    Connections {
+        target: repository
+        onStatusUpdated: theList.selectEntry(theList.currentIndex)
+    }
+
     ListView {
         id: theList
         anchors.fill:             parent
