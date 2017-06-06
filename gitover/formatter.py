@@ -1,9 +1,13 @@
+import logging
 import re
-from PyQt5.QtCore import QObject, pyqtProperty
+
+from PyQt5.QtCore import QObject, pyqtProperty, pyqtSignal, QTimer
 from PyQt5.QtGui import QSyntaxHighlighter, QColor, QTextCharFormat, QBrush, QFontMetrics, QFont
 from PyQt5.QtQuick import QQuickTextDocument
 
 from gitover.qml_helpers import QmlTypeMixin
+
+LOGGER = logging.getLogger(__name__)
 
 
 class GitDiffHightlighter(QSyntaxHighlighter):
@@ -84,12 +88,14 @@ class GitDiffHightlighter(QSyntaxHighlighter):
 class GitDiffFormatter(QObject, QmlTypeMixin):
     """Takes a QTextDocument and applies formatting on it"""
 
+    textDocumentChanged = pyqtSignal(QQuickTextDocument)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._doc = None
         self._txtdoc = None
 
-    @pyqtProperty(QQuickTextDocument)
+    @pyqtProperty(QQuickTextDocument, notify=textDocumentChanged)
     def textDocument(self):
         return self._doc
 
@@ -110,4 +116,9 @@ class GitDiffFormatter(QObject, QmlTypeMixin):
             self._doc = doc
             self._txtdoc = self._doc.textDocument() if self._doc else None
             self._highlighter = GitDiffHightlighter(self._txtdoc) if self._txtdoc else None
-            self._setTabWidth()
+            self.textDocumentChanged.emit(self._doc)
+
+            # setting highlighter and tabwidth immediately seems to trigger strange
+            # raising condition that leads to Qt crash !?
+            # Postpone setting tab width avoids the crash (temporarily) !?
+            QTimer.singleShot(50, self._setTabWidth)
