@@ -84,7 +84,7 @@ current repository during software development.
 I.e. your teammates may continue to deliver new stuff on _master_ branch.
 By setting the git config variable `gitover.trunkbranch` to _origin/master_ you can tell
 GitOver which _trunk_ branch is for this repository to get notified when there are
-changes that you could incorporate into you current local branch to keep up to date with
+changes that you could incorporate into your current local branch to keep up to date with
 the trunk branch.
 
 [1]: https://docs.python.org "Python"
