@@ -168,8 +168,17 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         self.endInsertRows()
         self.nofReposChanged.emit(self.nofRepos)
 
+        def repo_exists(path):
+            try:
+                if not os.path.isdir(path):
+                    return False
+                git.Repo(path)
+                return True
+            except:
+                return False
+
         rootpath = repo.path
-        subpaths = [r.abspath for r in git.Repo(rootpath).submodules]
+        subpaths = list(filter(repo_exists, [r.abspath for r in git.Repo(rootpath).submodules]))
         subpaths.sort(key=str.lower)
         for subpath in subpaths:
             name = subpath[len(rootpath) + 1:]
