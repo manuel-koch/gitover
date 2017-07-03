@@ -43,6 +43,7 @@ Item {
         anchors.top:       theTitle.bottom
         anchors.topMargin: 4
         width:             parent.width
+        spacing:           4
 
         Repeater {
             model: commits
@@ -62,7 +63,7 @@ Item {
                         Layout.leftMargin:     10
                         Layout.preferredWidth: 60
                         text:                  details.rev
-                        font.family:           "monospace"
+                        font.family:           "courier"
                         font.pointSize:        Theme.fonts.smallPointSize
                     }
                     SelectableTextline {
@@ -73,6 +74,7 @@ Item {
                     SelectableTextline {
                         Layout.fillWidth: true
                         text:             details.msg
+                        font.family:      "courier"
                         font.pointSize:   Theme.fonts.smallPointSize
                     }
                 }
@@ -88,13 +90,14 @@ Item {
                             Layout.leftMargin:     190 + 2*theCommitRow.spacing
                             Layout.preferredWidth: 12
                             text:                  modelData.change
-                            font.family:           "monospace"
+                            font.family:           "courier"
                             font.pointSize:        Theme.fonts.smallPointSize
                             color:                 Theme.changeTypeToColor(text)
                         }
                         SelectableTextline {
                             Layout.fillWidth: true
                             text:             modelData.path
+                            font.family:      "courier"
                             font.pointSize:   Theme.fonts.smallPointSize
                         }
                     }
