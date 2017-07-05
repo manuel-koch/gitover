@@ -28,8 +28,24 @@ Item {
     implicitHeight: childrenRect.height
 
     property Repo repository: null
-    property string title: ""
-    property var commits: null
+    property string title:    ""
+    property var commits:     null
+
+    QtObject {
+        id: internal
+        readonly property int pageSize: 20
+        property int page:         0
+        property int lastPage:     root.commits != null ? Math.ceil(root.commits.length/pageSize)-1 : 0
+        property bool hasPrevPage: page > 0
+        property bool hasNextPage: page < lastPage
+        property int firstPageIdx: page*pageSize
+        property int lastPageIdx:  root.commits != null ? Math.min( (page+1)*pageSize - 1, root.commits.length-1 ) : 0
+        property var pagedCommits: root.commits != null ? root.commits.slice(firstPageIdx,lastPageIdx+1)  : []
+    }
+
+    onCommitsChanged: {
+        internal.page = 0
+    }
 
     Text {
         id: theTitle
@@ -45,8 +61,19 @@ Item {
         width:             parent.width
         spacing:           4
 
+        Text {
+            width:           parent.width
+            height:          implicitHeight
+            leftPadding:     10
+            text:            (internal.hasPrevPage ? "<a href='prev'>&lt;&lt;</a> " : "") +
+                             "commit " + (internal.firstPageIdx+1) + "..." + (internal.lastPageIdx+1) +
+                             (internal.hasNextPage ? " <a href='next'>&gt;&gt;</a>" : "")
+            visible:         internal.hasPrevPage || internal.hasNextPage
+            onLinkActivated: internal.page += (link == "next" ? 1 : -1)
+        }
+
         Repeater {
-            model: commits
+            model: internal.pagedCommits
 
             Column {
                 width: parent.width
@@ -78,6 +105,7 @@ Item {
                         font.pointSize:   Theme.fonts.smallPointSize
                     }
                 }
+                // FIXME: This repeater is likely to cause Qt crash when too many changes need to be displayed !
                 Repeater {
                     model: details.changes
                     RowLayout {
