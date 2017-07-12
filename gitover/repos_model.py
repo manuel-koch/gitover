@@ -146,40 +146,38 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
     def nofRepos(self):
         return self.rowCount()
 
+    def _isRepo(self, path):
+        try:
+            if not os.path.isdir(path):
+                return False
+            return bool(git.Repo(path).head)
+        except:
+            LOGGER.exception("Path is not a git repo: {}".format(path))
+
     @pyqtSlot('QUrl')
     def addRepoByUrl(self, url):
         path = url.toLocalFile()
-        try:
-            is_git = bool(git.Repo(path).head)
-            self.addRepo(Repo(path))
-        except:
-            LOGGER.exception("Path is not a git repo: {}".format(path))
+        if self._isRepo(path):
+            return self.addRepo(Repo(path))
 
     def addRepo(self, repo):
         if any([r.path == repo.path for r in self._repos]):
             return
 
-        import datetime
-        s = datetime.datetime.now()
+        # find insert position
+        repo_paths = [r.path for r in self._repos] + [repo.path]
+        repo_paths.sort(key=lambda p: p.lower())
+        insert_idx = repo_paths.index(repo.path)
 
-        self.beginInsertRows(QModelIndex(), self.rowCount(), self.rowCount())
+        # insert new repo into model
+        self.beginInsertRows(QModelIndex(), insert_idx, insert_idx)
         repo.setParent(self)
-        self._repos += [repo]
+        self._repos.insert(insert_idx, repo)
         self.endInsertRows()
         self.nofReposChanged.emit(self.nofRepos)
 
-        def repo_exists(path):
-            try:
-                if not os.path.isdir(path):
-                    return False
-                git.Repo(path)
-                return True
-            except:
-                return False
-
         rootpath = repo.path
-        subpaths = list(filter(repo_exists, [r.abspath for r in git.Repo(rootpath).submodules]))
-        subpaths.sort(key=str.lower)
+        subpaths = list(filter(self._isRepo, [r.abspath for r in git.Repo(rootpath).submodules]))
         for subpath in subpaths:
             name = subpath[len(rootpath) + 1:]
             self._queued_path += [(subpath, name)]
