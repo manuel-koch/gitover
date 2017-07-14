@@ -49,6 +49,8 @@ from gitover.config import Config
 
 LOGGER = logging.getLogger(__name__)
 
+ONE_MEGABYTE = 1024 * 1024
+
 
 class ReposModel(QAbstractItemModel, QmlTypeMixin):
     """Model of repository data arranged in rows"""
@@ -1437,7 +1439,11 @@ class Repo(QObject, QmlTypeMixin):
             elif status == "staged":
                 diff = repo.git.diff("--", path, cached=True)
             elif status == "untracked":
-                diff = open(os.path.join(self._path, path), "r").read()
+                data = open(os.path.join(self._path, path), "r").read()
+                if len(data) > ONE_MEGABYTE:
+                    data = data[:ONE_MEGABYTE]
+                    data += "\n...omitted more data..."
+                diff = data
         return diff
 
     @pyqtSlot(str, result=QVariant)
