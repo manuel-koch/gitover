@@ -60,7 +60,7 @@ Rectangle {
         }
 
         function updateDiff() {
-            text = (root.repository !== null ? root.repository.diff(path,status) : "")
+            text = (root.repository !== null ? root.repository.diff(path,status,1024*512) : "")
         }
     }
 
