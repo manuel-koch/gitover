@@ -47,7 +47,7 @@ class GitDiffHightlighter(QSyntaxHighlighter):
                 charfmt.setForeground(QBrush(QColor(fmt_.get("fg"))))
             if fmt_.get("bg", "") and QColor.isValidColor(fmt_.get("bg")):
                 charfmt.setBackground(QBrush(QColor(fmt_.get("bg"))))
-            self.setFormat(s, e-s, charfmt)
+            self.setFormat(s, e - s, charfmt)
 
 
 class GitDiffFormatter(QObject, QmlTypeMixin):
@@ -59,6 +59,7 @@ class GitDiffFormatter(QObject, QmlTypeMixin):
         super().__init__(parent)
         self._doc = None
         self._txtdoc = None
+        self._highlighter = None
 
     @pyqtProperty(QQuickTextDocument, notify=textDocumentChanged)
     def textDocument(self):
@@ -80,7 +81,10 @@ class GitDiffFormatter(QObject, QmlTypeMixin):
         if self._doc != doc:
             self._doc = doc
             self._txtdoc = self._doc.textDocument() if self._doc else None
-            self._highlighter = GitDiffHightlighter(self._txtdoc) if self._txtdoc else None
+            if self._highlighter:
+                self._highlighter.setDocument(self._txtdoc)
+            else:
+                self._highlighter = GitDiffHightlighter(self._txtdoc)
             self.textDocumentChanged.emit(self._doc)
 
             # setting highlighter and tabwidth immediately seems to trigger strange
