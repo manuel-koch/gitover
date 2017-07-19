@@ -73,7 +73,7 @@ Rectangle {
         property real labelWidth:    50
 
         property bool hasChanges: untracked || modified || deleted || conflicts || staged
-        property bool canUpgrade: root.repository && root.repository.trunkBranchAhead
+        property bool canUpgrade: root.repository && (root.repository.trunkBranchAhead || root.repository.trackingBranchAhead)
         property bool canPush:    root.repository && root.repository.trackingBranchBehind
         property bool isDetached: root.repository && root.repository.detached
         property int untracked:   root.repository ? root.repository.untracked : 0
