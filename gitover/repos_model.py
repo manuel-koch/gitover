@@ -243,7 +243,7 @@ class CachedCommitDetails(object):
             else:
                 c = None
             while len(self._cache) > 250:
-                self._cache.popitem()
+                self._cache.popitem(last=False)
         return c
 
 
