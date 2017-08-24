@@ -31,6 +31,8 @@ import string
 import subprocess
 import threading
 import time
+
+import re
 from typing import NamedTuple
 
 import git
@@ -545,8 +547,17 @@ class GitCheckoutWorker(QObject):
     # signal gets emitted to trigger checkout given repo branch
     checkoutBranch = pyqtSignal(str)
 
+    # signal gets emitted to trigger creating given repo branch
+    createBranch = pyqtSignal(str)
+
     # signal gets emitted to trigger checkout given path in repo
     checkoutPath = pyqtSignal(str)
+
+    # signal gets emitted to trigger staging given path in repo
+    addPath = pyqtSignal(str)
+
+    # signal gets emitted to trigger un-staging given path in repo
+    resetPath = pyqtSignal(str)
 
     # signal gets emitted when starting/stopping pull action
     checkoutprogress = pyqtSignal(bool)
@@ -561,7 +572,10 @@ class GitCheckoutWorker(QObject):
         super().__init__()
         self._path = path
         self.checkoutBranch.connect(self._onCheckoutBranch)
+        self.createBranch.connect(self._onCreateBranch)
         self.checkoutPath.connect(self._onCheckoutPath)
+        self.addPath.connect(self._onAddPath)
+        self.resetPath.connect(self._onResetPath)
 
     @pyqtSlot(str)
     def _onCheckoutBranch(self, branch):
@@ -607,6 +621,29 @@ class GitCheckoutWorker(QObject):
             self.checkoutprogress.emit(False)
 
     @pyqtSlot(str)
+    def _onCreateBranch(self, branch):
+        """Checkout a new branch"""
+        try:
+            branch = re.subn("[^\w\-_]", "", branch.strip())[0]
+            branch = re.subn("\s", "_", branch)[0]
+            if not branch.strip():
+                return
+
+            self.checkoutprogress.emit(True)
+            repo = git.Repo(self._path)
+
+            err_hint = "create branch"
+            proc = repo.git.checkout("-b", branch,
+                                     with_extended_output=True, as_process=True)
+            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+        except:
+            LOGGER.exception(
+                "Failed to create branch {} in git repo at {}".format(branch, self._path))
+            self.error.emit("Failed to " + err_hint)
+        finally:
+            self.checkoutprogress.emit(False)
+
+    @pyqtSlot(str)
     def _onCheckoutPath(self, path):
         """Checkout selected path reverting any local changes"""
         try:
@@ -622,6 +659,40 @@ class GitCheckoutWorker(QObject):
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
         except:
             LOGGER.exception("Failed to checkout {} in git repo at {}".format(path, self._path))
+            self.error.emit("Failed to " + err_hint)
+        finally:
+            self.checkoutprogress.emit(False)
+
+    @pyqtSlot(str)
+    def _onAddPath(self, path):
+        """Add selected path to staging"""
+        try:
+            self.checkoutprogress.emit(True)
+            repo = git.Repo(self._path)
+
+            err_hint = "add"
+            proc = repo.git.add("--", path,
+                                with_extended_output=True, as_process=True)
+            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+        except:
+            LOGGER.exception("Failed to add {} in git repo at {}".format(path, self._path))
+            self.error.emit("Failed to " + err_hint)
+        finally:
+            self.checkoutprogress.emit(False)
+
+    @pyqtSlot(str)
+    def _onResetPath(self, path):
+        """Reset / un-stage selected path"""
+        try:
+            self.checkoutprogress.emit(True)
+            repo = git.Repo(self._path)
+
+            err_hint = "unstage"
+            proc = repo.git.reset("--", path,
+                                  with_extended_output=True, as_process=True)
+            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+        except:
+            LOGGER.exception("Failed to unstage {} in git repo at {}".format(path, self._path))
             self.error.emit("Failed to " + err_hint)
         finally:
             self.checkoutprogress.emit(False)
@@ -1218,6 +1289,14 @@ class Repo(QObject, QmlTypeMixin):
         self._checkoutWorker.checkoutBranch.emit(branch)
         self._checkoutTriggered = True
 
+    @pyqtSlot(str)
+    def triggerCreateBranch(self, branch):
+        if self._checkoutTriggered:
+            LOGGER.debug("Checkout already triggered...")
+            return
+        self._checkoutWorker.createBranch.emit(branch)
+        self._checkoutTriggered = True
+
     @pyqtProperty(bool, notify=rebasingChanged)
     def rebasing(self):
         return self._rebasing
@@ -1349,6 +1428,12 @@ class Repo(QObject, QmlTypeMixin):
         if name == "__discard":
             os.unlink(os.path.join(self._path, path))
             return
+        if name == "__stage":
+            self._checkoutWorker.addPath.emit(path)
+            return
+        if name == "__unstage":
+            self._checkoutWorker.resetPath.emit(path)
+            return
 
         tool = cfg.statusTool(status, name)
         if not tool:
@@ -1409,14 +1494,22 @@ class Repo(QObject, QmlTypeMixin):
     @pyqtSlot(str, result=QVariant)
     def statusCmds(self, status):
         """
-        Returns a list of dict with keys name,title to configure commands for file(s)
+        Returns a list of dict with keys name & title to configure commands for file(s)
         of selected status in current repository
         """
+        all_cmds = OrderedDict()
+        all_cmds["__revert"] = dict(title="Checkout / Revert",
+                                    statuses=("modified", "deleted"))
+        all_cmds["__stage"] = dict(title="Stage / Add",
+                                   statuses=("modified", "untracked", "deleted"))
+        all_cmds["__discard"] = dict(title="Discard / Remove",
+                                     statuses=("untracked",))
+        all_cmds["__unstage"] = dict(title="Unstage / Reset",
+                                     statuses=("staged",))
         cmds = []
-        if status == "modified":
-            cmds += [dict(name="__revert", title="Revert")]
-        if status == "untracked":
-            cmds += [dict(name="__discard", title="Discard")]
+        for cmd, config in all_cmds.items():
+            if status in config["statuses"]:
+                cmds += [dict(name=cmd, title=config["title"])]
         return QVariant(cmds)
 
     @pyqtSlot(str, result=QVariant)

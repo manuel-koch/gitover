@@ -56,9 +56,18 @@ Rectangle {
             }
             Text {
                 Layout.fillWidth: true
-                text:             "Local Branches :"
-                font.bold:        true
+                text:             "<b>Local Branches</b> --> <a href='create'>create</a>"
                 visible:          root.repository !== null
+                onLinkActivated:  theBranchNameDialog.openDialog()
+                InputTextDialog {
+                    id: theBranchNameDialog
+                    title:    "Create branch"
+                    subTitle: "Enter name of new branch :\n\nAny non word characters ( except '-' and '_' ) are removed and space characters are converted to '_'."
+                    onOk: {
+                        if( text )
+                            repository.triggerCreateBranch(text)
+                    }
+                }
             }
             Repeater {
                 Layout.fillWidth:  true
