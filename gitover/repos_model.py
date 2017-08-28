@@ -624,8 +624,8 @@ class GitCheckoutWorker(QObject):
     def _onCreateBranch(self, branch):
         """Checkout a new branch"""
         try:
-            branch = re.subn("[^\w\-_]", "", branch.strip())[0]
-            branch = re.subn("\s", "_", branch)[0]
+            branch = re.subn("\s", "_", branch.strip())[0]
+            branch = re.subn("[^\w\-_]", "", branch)[0]
             if not branch.strip():
                 return
 
