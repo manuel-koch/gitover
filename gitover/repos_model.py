@@ -219,6 +219,7 @@ CommitChange = NamedTuple("CommitChange", (("change", str),
 
 class CachedCommitDetails(object):
     """Caching commit info for sake of performance"""
+    cache_size = 500
 
     def __init__(self):
         self._cache = OrderedDict()
@@ -244,7 +245,7 @@ class CachedCommitDetails(object):
                 c = self._create(rev, repo)
             else:
                 c = None
-            while len(self._cache) > 250:
+            while len(self._cache) > self.cache_size:
                 self._cache.popitem(last=False)
         return c
 
