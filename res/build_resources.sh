@@ -4,7 +4,7 @@ BASE_DIR=$(dirname ${0})
 
 IN=${BASE_DIR}/resources.qrc
 OUT=${BASE_DIR}/../gitover/ui/resources.py
-echo "Building Resources ( $(which pyrcc5) )..."
+echo "Building Resources ( $(which pyrcc5) : $(pyrcc5 -version 2>&1 | cut -d' ' -f2) )..."
 echo "from ${IN}"
 echo "to   ${OUT}"
 [ -s "$OUT" ] && rm "$OUT"
