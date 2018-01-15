@@ -36,7 +36,7 @@ from gitover.repos_model import ReposModel, Repo, ChangedFilesModel, OutputModel
 from gitover.formatter import GitDiffFormatter
 from gitover.res_helper import getResourceUrl
 
-__version__ = "0.17.3"
+__version__ = "0.17.4"
 
 LOGGER = logging.getLogger(__name__)
 

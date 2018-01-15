@@ -264,7 +264,7 @@ class GitStatus(object):
         self.trackingBranch = ""  # tracking branch of current branch
         self.trackingBranchAhead = []  # list of commits that tracking branch is ahead of current branch
         self.trackingBranchBehind = []  # list of commits that tracking branch is behind of current branch
-        self.trunkBranch = ""  # trunk branch of repositiory
+        self.trunkBranch = ""  # trunk branch of repository
         self.trunkBranchAhead = []  # list of commits that trunk branch is ahead of current branch
         self.trunkBranchBehind = []  # list of commits that trunk branch is ahead of current branch
         self.untracked = set()  # set of untracked paths in repository
@@ -324,12 +324,15 @@ class GitStatus(object):
 
         try:
             trackedBranches = [self._trackingBranch(repo, b) for b in self.branches]
-            remoteBranches = [r.name for r in repo.references
-                              if isinstance(r, git.RemoteReference) and
-                              r.name != (r.remote_name + "/HEAD") and
-                              r.name not in trackedBranches]
-            remoteBranches.sort(key=str.lower)
-            self.remoteBranches = remoteBranches
+            allRemoteBranches = [r.name for r in repo.references
+                                 if isinstance(r, git.RemoteReference) and
+                                 r.name != (r.remote_name + "/HEAD")]
+            availRemoteBranches = [r.name for r in repo.references
+                                   if isinstance(r, git.RemoteReference) and
+                                   r.name != (r.remote_name + "/HEAD") and
+                                   r.name not in trackedBranches]
+            availRemoteBranches.sort(key=str.lower)
+            self.remoteBranches = availRemoteBranches
         except:
             LOGGER.exception("Invalid branches for {}".format(self.path))
 
@@ -345,15 +348,20 @@ class GitStatus(object):
                              .format(self.path))
 
         try:
-            self.trunkBranch = repo.git.config("gitover.trunkbranch", with_exceptions=False)
-            if not self.trunkBranch:
-                self.trunkBranch = "origin/develop"
+            trunkBranches = [repo.git.config("gitover.trunkbranch", with_exceptions=False),
+                             "origin/develop", "origin/master"]
+            while trunkBranches and trunkBranches[0] not in allRemoteBranches:
+                trunkBranches.pop(0)
+            self.trunkBranch = trunkBranches[0] if trunkBranches else ""
+        except:
+            LOGGER.exception("Failed to determine trunk branch for {}".format(self.path))
+
+        try:
             ahead, behind = self._commitsAheadBehind(repo, self.trunkBranch)
             self.trunkBranchAhead = ahead
             self.trunkBranchBehind = behind
         except:
-            LOGGER.exception(
-                "Failed to get trunk branch ahead/behind counters for {}".format(self.path))
+            LOGGER.exception("Failed to get trunk branch ahead/behind counters for {}".format(self.path))
 
         self.untracked = set(repo.untracked_files)
         for diff in repo.index.diff(other=None):  # diff against working tree
