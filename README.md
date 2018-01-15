@@ -103,7 +103,17 @@ GitOver which _trunk_ branch is for this repository to get notified when there a
 changes that you could incorporate into your current local branch to keep up to date with
 the trunk branch.
 
+## GitOver fails to start after major OS update/upgrade
+
+Double clicking the GitOver app doesn't start it - instead it crashes silently.
+It may still run when starting it explicitly on console.
+Cause may be misconfigured or not yet installed XCode stuff after Mac OSX upgrade ( i.e. to High Sierra ).
+You may need to reinstall XCode stuff to get git working again, [see][5].
+
+
+
 [1]: https://docs.python.org "Python"
 [2]: http://pyqt.sourceforge.net/Docs/PyQt5/ "PyQt5"
 [3]: http://gitpython.readthedocs.io/en/stable/ "GitPython"
 [4]: http://www.pyinstaller.org/ "PyInstaller"
+[5]: http://www.linuxuk.org/post/fixing_git_on_macOS_Sierra/
