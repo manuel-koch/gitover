@@ -1,5 +1,5 @@
 PyInstaller>=3.2
-PyQt5>=5.8
+PyQt5>=5.8,<5.9
 GitPython>=2.1.8
 PyYAML>=3.11
 watchdog>=0.8.3
