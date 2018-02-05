@@ -1436,6 +1436,7 @@ class Repo(QObject, QmlTypeMixin):
             return
         if name == "__discard":
             os.unlink(os.path.join(self._path, path))
+            self.triggerUpdate()
             return
         if name == "__stage":
             self._checkoutWorker.addPath.emit(path)
