@@ -37,6 +37,21 @@ ApplicationWindow {
                 shortcut:    "Ctrl+O"
                 onTriggered: theAddRepoDialog.openDialog()
             }
+
+            Menu {
+                id: recentReposMenu
+                title: "Open recent repository..."
+                Instantiator {
+                    model: globalRepositories.recentRepos
+                    MenuItem {
+                        text: index < globalRepositories.recentRepos.length && globalRepositories.recentRepos[index] ? globalRepositories.recentRepos[index].title + " ( " + globalRepositories.recentRepos[index].subtitle + " )" : ""
+                        onTriggered: globalRepositories.addRepoByPath(globalRepositories.recentRepos[index].path)
+                    }
+                    onObjectAdded: recentReposMenu.insertItem(index, object)
+                    onObjectRemoved: recentReposMenu.removeItem(object)
+                }
+            }
+
             MenuItem {
                 text:        "About Gitover"
                 onTriggered: theAboutDialog.openDialog()

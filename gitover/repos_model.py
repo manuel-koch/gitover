@@ -39,7 +39,7 @@ import git
 from git.cmd import handle_process_output
 from git.util import finalize_process
 
-from PyQt5.QtCore import QModelIndex, pyqtSlot, Q_ENUMS, QTimer
+from PyQt5.QtCore import QModelIndex, pyqtSlot, Q_ENUMS, QTimer, QSettings
 from PyQt5.QtCore import QVariant
 from PyQt5.QtCore import Qt, pyqtProperty, pyqtSignal, QObject
 from PyQt5.QtCore import QAbstractItemModel
@@ -58,6 +58,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
     """Model of repository data arranged in rows"""
 
     nofReposChanged = pyqtSignal(int)
+    recentReposChanged = pyqtSignal()
 
     ROLE_REPO = Qt.UserRole + 1
 
@@ -73,6 +74,8 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         self._fsWatcher.repoChanged.connect(self._onRepoChanged)
 
         self._repos = []
+        self._recentRepos = []
+        self._loadRecentRepos()
 
         self._queued_path = []
         self._queueTimer = QTimer()
@@ -84,6 +87,47 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         gitexe = cfg.general()["git"]
         if gitexe:
             git.Git.GIT_PYTHON_GIT_EXECUTABLE = gitexe
+
+    def _loadRecentRepos(self):
+        self._recentRepos = []
+        settings = QSettings()
+        nof = settings.beginReadArray("recentRepos")
+        removedObsolete = False
+        for idx in range(nof):
+            settings.setArrayIndex(idx)
+            path = settings.value("path")
+            title = settings.value("title")
+            subtitle = os.path.dirname(path)
+            subtitle = "...{}".format(subtitle[-32:]) if len(subtitle) > 32 else subtitle
+            if os.path.isdir(path):
+                self._recentRepos.append(dict(path=path, title=title, subtitle=subtitle))
+            else:
+                removedObsolete = True
+        settings.endArray()
+        if removedObsolete:
+            self._saveRecentRepos()
+        else:
+            self.recentReposChanged.emit()
+
+    def _addRecentRepos(self, repo):
+        if any([recent["path"] == repo.path for recent in self._recentRepos]):
+            return
+        subtitle = os.path.dirname(repo.path)
+        subtitle = "...{}".format(subtitle[-32:]) if len(subtitle) > 32 else subtitle
+        self._recentRepos.append(dict(path=repo.path, title=repo.name, subtitle=subtitle))
+        self._recentRepos.sort(key=lambda r: r["path"])
+        self._saveRecentRepos()
+
+    def _saveRecentRepos(self):
+        settings = QSettings()
+        nof = len(self._recentRepos)
+        settings.beginWriteArray("recentRepos", nof)
+        for idx, recent in enumerate(self._recentRepos):
+            settings.setArrayIndex(idx)
+            settings.setValue("path", recent["path"])
+            settings.setValue("title", recent["title"])
+        settings.endArray()
+        self.recentReposChanged.emit()
 
     def roleNames(self):
         roles = super().roleNames()
@@ -150,6 +194,10 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
     def nofRepos(self):
         return self.rowCount()
 
+    @pyqtProperty(QVariant, notify=recentReposChanged)
+    def recentRepos(self):
+        return QVariant(self._recentRepos)
+
     def _isRepo(self, path):
         try:
             if not os.path.isdir(path):
@@ -160,11 +208,14 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
 
     @pyqtSlot('QUrl')
     def addRepoByUrl(self, url):
-        path = url.toLocalFile()
-        if self._isRepo(path):
-            return self.addRepo(Repo(path))
+        self.addRepoByPath(url.toLocalFile(), saveAsRecent=True)
 
-    def addRepo(self, repo):
+    @pyqtSlot(str)
+    def addRepoByPath(self, path, saveAsRecent=False):
+        if self._isRepo(path):
+            return self.addRepo(Repo(path), saveAsRecent)
+
+    def addRepo(self, repo, saveAsRecent=False):
         if any([r.path == repo.path for r in self._repos]):
             return
 
@@ -190,6 +241,9 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
             self._fsWatcher.track.emit(rootpath)
 
         self._queueTimer.start()
+
+        if saveAsRecent:
+            self._addRecentRepos(repo)
 
     def _nextAddRepo(self):
         if not self._queued_path:
@@ -344,8 +398,8 @@ class GitStatus(object):
                     self.trackingBranchAhead = ahead
                     self.trackingBranchBehind = behind
         except:
-            LOGGER.exception("Failed to get tracking branch ahead/behind counters for {}"
-                             .format(self.path))
+            LOGGER.exception("Failed to get tracking branch '{}' ahead/behind counters for {}"
+                             .format(self.trackingBranch, self.path))
 
         try:
             trunkBranches = [repo.git.config("gitover.trunkbranch", with_exceptions=False),
@@ -361,7 +415,8 @@ class GitStatus(object):
             self.trunkBranchAhead = ahead
             self.trunkBranchBehind = behind
         except:
-            LOGGER.exception("Failed to get trunk branch ahead/behind counters for {}".format(self.path))
+            LOGGER.exception("Failed to get trunk branch '{}' ahead/behind counters for {}"
+                             .format(self.trunkBranch, self.path))
 
         self.untracked = set(repo.untracked_files)
         for diff in repo.index.diff(other=None):  # diff against working tree
