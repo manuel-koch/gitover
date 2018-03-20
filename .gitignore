@@ -4,6 +4,7 @@
 *.pyc
 *.qmlc
 *.spec
+gitover/ui/resources.py
 res/icon.icns
 dist/
 build/

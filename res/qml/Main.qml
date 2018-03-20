@@ -43,7 +43,7 @@ ApplicationWindow {
             }
             MenuItem {
                 text:        "Quit"
-                onTriggered: Qt.quit()
+                onTriggered: root.close()
             }
         }
         Menu {
