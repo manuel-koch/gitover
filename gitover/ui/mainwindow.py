@@ -44,12 +44,14 @@ LOGGER = logging.getLogger(__name__)
 def messageHandler(msgType, context, msg):
     if msgType == QtCore.QtCriticalMsg or msgType == QtCore.QtFatalMsg:
         logfunc = LOGGER.error
-    if msgType == QtCore.QtWarningMsg:
+    elif msgType == QtCore.QtWarningMsg:
         logfunc = LOGGER.warning
-    if msgType == QtCore.QtDebugMsg:
+    elif msgType == QtCore.QtDebugMsg:
         logfunc = LOGGER.debug
     else:
         logfunc = LOGGER.info
+    if not context.file:
+        pass
     logfunc("{}({}): {}".format(context.file, context.line, msg))
 
 
@@ -66,7 +68,7 @@ def run_gui(repo_paths, watch_filesystem):
     app.setWindowIcon(QIcon(':/icon.png'))
     QThread.currentThread().setObjectName('mainThread')
 
-    LOGGER.info("{} ({})".format(app.applicationName(),app.applicationVersion()))
+    LOGGER.info("{} ({})".format(app.applicationName(), app.applicationVersion()))
 
     qInstallMessageHandler(messageHandler)
 
