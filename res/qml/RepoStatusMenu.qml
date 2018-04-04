@@ -17,7 +17,7 @@
 //
 import QtQuick 2.6
 import QtQuick.Layouts 1.2
-import QtQuick.Controls 1.4
+import QtQuick.Controls 2.3
 import Gitover 1.0
 import "."
 
@@ -50,7 +50,7 @@ Menu {
 
     Instantiator {
         model: internal.commands
-        MenuItem {
+        CustomMenuItem {
             text: internal.commands && index < internal.commands.length && internal.commands[index] ? internal.commands[index].title : ""
             onTriggered: repository.execStatusCmd(internal.commands[index].name, theMenu.status, theMenu.path)
         }
@@ -58,17 +58,33 @@ Menu {
         onObjectRemoved: theMenu.removeItem(object)
     }
 
-    MenuSeparator {
-        visible: internal.tools && internal.tools.length
+    Instantiator {
+        model: internal.tools && internal.tools.length ? 1 : null
+        MenuSeparator {
+            contentItem: Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width-4
+                implicitHeight: 1
+                color: "silver"
+            }
+            background: Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width-4
+                implicitHeight: 3
+                color: "white"
+            }
+        }
+        onObjectAdded: theMenu.insertItem(internal.commands.length, object)
+        onObjectRemoved: theMenu.removeItem(object)
     }
 
     Instantiator {
         model: internal.tools
-        MenuItem {
+        CustomMenuItem {
             text: internal.tools && index < internal.tools.length && internal.tools[index] ? internal.tools[index].title : ""
             onTriggered: repository.execStatusCmd(internal.tools[index].name, theMenu.status, theMenu.path)
         }
-        onObjectAdded: theMenu.insertItem(index, object)
+        onObjectAdded: theMenu.insertItem(internal.commands.length + 1 + index, object)
         onObjectRemoved: theMenu.removeItem(object)
     }
 }

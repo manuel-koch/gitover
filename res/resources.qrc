@@ -5,6 +5,7 @@
     <file>qml/AboutDialog.qml</file>
     <file>qml/BranchCombo.qml</file>
     <file>qml/BranchDetails.qml</file>
+    <file>qml/CustomMenuItem.qml</file>
     <file>qml/GradientBorder.qml</file>
     <file>qml/InputTextDialog.qml</file>
     <file>qml/LabelValueRow.qml</file>
