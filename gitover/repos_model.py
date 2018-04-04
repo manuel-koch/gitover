@@ -213,11 +213,13 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
     @pyqtSlot(str)
     def addRepoByPath(self, path, saveAsRecent=False):
         if self._isRepo(path):
-            return self.addRepo(Repo(path), saveAsRecent)
+            repo = Repo(path)
+            if not self.addRepo(repo, saveAsRecent):
+                repo.stopWorker()
 
     def addRepo(self, repo, saveAsRecent=False):
         if any([r.path == repo.path for r in self._repos]):
-            return
+            return False
 
         # find insert position
         repo_paths = [r.path for r in self._repos] + [repo.path]
@@ -245,12 +247,15 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         if saveAsRecent:
             self._addRecentRepos(repo)
 
+        return True
+
     def _nextAddRepo(self):
         if not self._queued_path:
             return
         path, name = self._queued_path.pop(0)
         repo = Repo(path, name)
-        self.addRepo(repo)
+        if not self.addRepo(repo):
+            repo.stopWorker()
         self._queueTimer.start()
 
     def _onRepoChanged(self, path):
@@ -1255,9 +1260,6 @@ class Repo(QObject, QmlTypeMixin):
 
         self.triggerUpdate()
         self.triggerFetch()
-
-    def __del__(self):
-        self.stopWorker()
 
     def __str__(self):
         return self._path
