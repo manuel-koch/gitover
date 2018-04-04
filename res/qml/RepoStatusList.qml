@@ -43,7 +43,10 @@ Rectangle {
 
     Connections {
         target: repository
-        onStatusUpdated: theList.selectEntry(theList.currentIndex)
+        onStatusUpdated: {
+            theMenu.close()
+            theList.selectEntry(theList.currentIndex)
+        }
     }
 
     ListView {
