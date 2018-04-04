@@ -128,11 +128,14 @@ class RepoFsWatcher(QObject):
         if not os.path.exists(basepath) or self.ignored(repo, basepath):
             return
         LOGGER.debug("Update tracking\n\t in repo %s\n\tfor path %s", repo.working_dir, basepath)
-        addTrackPaths = set([basepath])
+        addTrackPaths = {basepath}
         for root, dirs, files in os.walk(basepath):
             if self._tracking_stopped:
                 return
-            if root == repo.git_dir and "objects" in dirs:
+            if root not in self._dirSnapshots:
+                self._dirSnapshots[root] = {os.path.join(root, p) for p in dirs + files}
+            inside_git_dir = git.Git(root).rev_parse(is_inside_git_dir=True) == "true"
+            if inside_git_dir and "objects" in dirs:
                 dirs.remove("objects")
             for ignoredDir in [path for path in dirs if
                                self.ignored(repo, os.path.join(root, path))]:
@@ -166,19 +169,22 @@ class RepoFsWatcher(QObject):
         if not path in self._dirSnapshots:
             self._dirSnapshots[path] = set()
         if os.path.isdir(path):
-            paths = set([os.path.join(path, p) for p in os.listdir(path)])
+            paths = {os.path.join(path, p) for p in os.listdir(path)}
         else:
             paths = set()
-        diff = bool(paths.difference(self._dirSnapshots[path]))
+        addedPaths = paths.difference(self._dirSnapshots[path])
+        removedPaths = self._dirSnapshots[path].difference(paths)
         self._dirSnapshots[path] = paths
-        return diff
+        return addedPaths | removedPaths
 
     @pyqtSlot(str)
     def _onDirChanged(self, path):
         LOGGER.debug("FsWatcher._onDirChanged %s", path)
-        if self._compareDirSnapshots(path):
+        diffPaths = self._compareDirSnapshots(path)
+        if diffPaths:
             self._queueChangedPath(path)
-            self._queueTrackUpdate(path)
+        for dp in diffPaths:
+            self._queueTrackUpdate(dp)
 
     def _queueChangedPath(self, path):
         self._changedQueue.put(path)
