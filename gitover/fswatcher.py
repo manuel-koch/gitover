@@ -34,6 +34,7 @@ class RepoFsWatcher(QObject):
         self._updateTrackTimer.setInterval(5000)
         self._updateTrackTimer.setSingleShot(True)
         self._updateTrackTimer.timeout.connect(self._onUpdateTrack)
+        self._tracking_stopped = False
         self._repos = []
         self._dirSnapshots = {}
         self.track.connect(self.startTracking)
@@ -99,6 +100,7 @@ class RepoFsWatcher(QObject):
                     break
         else:
             LOGGER.info("Stop tracking...")
+            self._tracking_stopped = True
             trackedPaths = self._fswatcher.files() + self._fswatcher.directories()
             if trackedPaths:
                 self._fswatcher.removePaths(trackedPaths)
@@ -117,6 +119,8 @@ class RepoFsWatcher(QObject):
         LOGGER.debug("Tracking %d files and %d directories", nofFiles, nofDirs)
 
     def _updateTracking(self, repo, basepath=None):
+        if self._tracking_stopped:
+            return
         if not basepath:
             self._updateTracking(repo, repo.working_dir)
             self._updateTracking(repo, repo.git_dir)
@@ -126,6 +130,8 @@ class RepoFsWatcher(QObject):
         LOGGER.debug("Update tracking\n\t in repo %s\n\tfor path %s", repo.working_dir, basepath)
         addTrackPaths = set([basepath])
         for root, dirs, files in os.walk(basepath):
+            if self._tracking_stopped:
+                return
             if root == repo.git_dir and "objects" in dirs:
                 dirs.remove("objects")
             for ignoredDir in [path for path in dirs if
