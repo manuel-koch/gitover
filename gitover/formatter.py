@@ -86,6 +86,7 @@ class GitDiffFormatter(QObject, QmlTypeMixin):
             else:
                 self._highlighter = GitDiffHightlighter(self._txtdoc)
             self.textDocumentChanged.emit(self._doc)
+            self._highlighter.rehighlight()
 
             # setting highlighter and tabwidth immediately seems to trigger strange
             # raising condition that leads to Qt crash !?
