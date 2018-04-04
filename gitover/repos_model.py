@@ -1601,7 +1601,9 @@ class Repo(QObject, QmlTypeMixin):
             elif status == "staged":
                 diff = repo.git.diff("--", path, cached=True)
             elif status == "untracked":
-                diff = open(os.path.join(self._path, path), "r").read()
+                path = os.path.join(self._path, path)
+                if os.path.isfile(path):
+                    diff = open(path, "r").read()
         if len(diff) > maxSize:
             diff = diff[:maxSize]
             diff += "\n...omitted more data..."
