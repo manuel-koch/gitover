@@ -1175,7 +1175,8 @@ class Repo(QObject, QmlTypeMixin):
         self._changes = ChangedFilesModel(self)
         self._output = OutputModel(self)
 
-        self._workerThread = QThread(self, objectName="workerThread-{}".format(name))
+        workerName = "workerThread-{}-{}".format(id(self), self._name)
+        self._workerThread = QThread(self, objectName=workerName)
         self._workerThread.start()
 
         self._statusWorker = GitStatusWorker()
@@ -1254,6 +1255,9 @@ class Repo(QObject, QmlTypeMixin):
 
         self.triggerUpdate()
         self.triggerFetch()
+
+    def __del__(self):
+        self.stopWorker()
 
     def __str__(self):
         return self._path
