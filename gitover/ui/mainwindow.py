@@ -31,12 +31,11 @@ from PyQt5.QtGui import QGuiApplication, QIcon
 from PyQt5.QtQml import QQmlApplicationEngine
 from PyQt5.QtQuick import QQuickView
 
-import gitover.ui.resources  # Only need this to get access to embedded Qt resources
+from gitover.ui.resources import gitover_commit_sha, gitover_version
 from gitover.repos_model import ReposModel, Repo, ChangedFilesModel, OutputModel
 from gitover.formatter import GitDiffFormatter
 from gitover.res_helper import getResourceUrl
 
-__version__ = "0.17.6"
 
 LOGGER = logging.getLogger(__name__)
 
@@ -50,8 +49,6 @@ def messageHandler(msgType, context, msg):
         logfunc = LOGGER.debug
     else:
         logfunc = LOGGER.info
-    if not context.file:
-        pass
     logfunc("{}({}): {}".format(context.file, context.line, msg))
 
 
@@ -64,7 +61,7 @@ def run_gui(repo_paths, watch_filesystem):
     app.setOrganizationName("MKO")
     app.setOrganizationDomain("mko.com")
     app.setApplicationName("GitOver")
-    app.setApplicationVersion("{}".format(__version__))
+    app.setApplicationVersion("{}".format(gitover_version))
     app.setWindowIcon(QIcon(':/icon.png'))
     QThread.currentThread().setObjectName('mainThread')
 
@@ -91,7 +88,8 @@ def run_gui(repo_paths, watch_filesystem):
 
     engine = QQmlApplicationEngine(app)
     engine.setOutputWarningsToStandardError(True)
-    engine.rootContext().setContextProperty("globalVersion", __version__)
+    engine.rootContext().setContextProperty("globalVersion", gitover_version)
+    engine.rootContext().setContextProperty("globalCommitSha", gitover_commit_sha)
     engine.rootContext().setContextProperty("globalRepositories", repos)
     engine.load(getResourceUrl("qml/Main.qml"))
 

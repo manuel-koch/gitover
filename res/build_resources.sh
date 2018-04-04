@@ -2,19 +2,23 @@
 set -e
 BASE_DIR=$(dirname ${0})
 
-IN=${BASE_DIR}/resources.qrc
-OUT=${BASE_DIR}/../gitover/ui/resources.py
+RESOURCE_IN=${BASE_DIR}/resources.qrc
+RESOURCE_OUT=${BASE_DIR}/../gitover/ui/resources.py
+
 echo "Building Resources ( $(which pyrcc5) : $(pyrcc5 -version 2>&1 | cut -d' ' -f2) )..."
-echo "from ${IN}"
-echo "to   ${OUT}"
-[ -s "$OUT" ] && rm "$OUT"
-pyrcc5 -o "$OUT" "$IN" && echo Done
+echo "from ${RESOURCE_IN}"
+echo "to   ${RESOURCE_OUT}"
+[ -s "$RESOURCE_OUT" ] && rm "$RESOURCE_OUT"
+pyrcc5 -o "$RESOURCE_OUT" "$RESOURCE_IN" && echo Done
 
-IN=${BASE_DIR}/icon.png
-OUT=${BASE_DIR}/icon.icns
+echo  >> "$RESOURCE_OUT"
+echo  >> "$RESOURCE_OUT"
+echo "gitover_commit_sha = '$(git rev-parse --short=8 HEAD)'" >> "$RESOURCE_OUT"
+echo "gitover_version = '$(git tag | grep -e "^v" | sort | tail -1 | cut -b2-)'" >> "$RESOURCE_OUT"
+
+ICON_IN=${BASE_DIR}/icon.png
+ICON_OUT=${BASE_DIR}/icon.icns
 echo "Building Iconset..."
-echo "from ${IN}"
-echo "to   ${OUT}"
-sips -s format icns "$IN" --out "$OUT"
-
-sleep 3
+echo "from ${ICON_IN}"
+echo "to   ${ICON_OUT}"
+sips -s format icns "$ICON_IN" --out "$ICON_OUT"
