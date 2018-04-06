@@ -1,13 +1,14 @@
 import logging
 import os
-import queue
+import time
 
 import git
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QObject, QMetaObject
+
+from PyQt5.QtCore import QDir
+from PyQt5.QtCore import QObject
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PyQt5.QtCore import QTimer
-from PyQt5.QtCore import QFileSystemWatcher
+from PyQt5.QtWidgets import QFileSystemModel
 
 LOGGER = logging.getLogger(__name__)
 
@@ -21,40 +22,123 @@ class RepoFsWatcher(QObject):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._fswatcher = QFileSystemWatcher(self)
-        self._fswatcher.fileChanged.connect(self._onFileChanged)
-        self._fswatcher.directoryChanged.connect(self._onDirChanged)
-        self._changedQueue = queue.Queue()
-        self._updateTrackQueue = queue.Queue()
-        self._flushChangedTimer = QTimer(self)
-        self._flushChangedTimer.setInterval(2000)
-        self._flushChangedTimer.setSingleShot(True)
-        self._flushChangedTimer.timeout.connect(self._onFlushChanged)
-        self._updateTrackTimer = QTimer(self)
-        self._updateTrackTimer.setInterval(5000)
-        self._updateTrackTimer.setSingleShot(True)
-        self._updateTrackTimer.timeout.connect(self._onUpdateTrack)
-        self._tracking_stopped = False
-        self._repos = []
-        self._dirSnapshots = {}
+        self._trackers = []
         self.track.connect(self.startTracking)
 
-    def ignored(self, repo, path):
+        self._changes = set()
+        self._flushChangesTimer = QTimer(self)
+        self._flushChangesTimer.setInterval(2000)
+        self._flushChangesTimer.setSingleShot(True)
+        self._flushChangesTimer.timeout.connect(self._onFlushChanges)
+
+    @pyqtSlot(str)
+    def startTracking(self, path):
+        tracker = RepoTracker(path, self)
+        self._trackers += [tracker]
+        tracker.repoChanged.connect(self._onRepoChanged)
+
+    def _onRepoChanged(self, path):
+        self._changes.add(path)
+        self._flushChangesTimer.start()
+
+    def _onFlushChanges(self):
+        for path in self._changes:
+            LOGGER.info("Repo changed {}".format(path))
+            self.repoChanged.emit(path)
+        self._changes = set()
+
+    def stopTracking(self):
+        for tracker in self._trackers:
+            tracker.deleteLater()
+        self._trackers = []
+
+
+class RepoTracker(QObject):
+    # signal gets emitted when content of repository has changed
+    repoChanged = pyqtSignal(str)
+
+    def __init__(self, path, parent=None):
+        super().__init__(parent)
+        self._path = path
+        repo = git.Repo(self._path)
+        self._working_dir = repo.working_dir
+        self._git_dir = repo.git_dir
+        self._initial_mtime = time.time()
+        self._mods = {}
+        self._fs = QFileSystemModel(self)
+        self._fs.setFilter(QDir.AllEntries | QDir.Hidden | QDir.NoDot | QDir.NoDotDot)
+        self._fs.setReadOnly(True)
+        self._fs.setRootPath(self._path)
+        self._fs.directoryLoaded.connect(self._onDirLoaded)
+        self._fs.rowsAboutToBeRemoved.connect(self._onAboutToBeRemoved)
+
+    def _update(self, path):
+        try:
+            old_mtime = self._mods.get(path, 0)
+            new_mtime = os.stat(path).st_mtime
+            self._mods[path] = new_mtime
+            if old_mtime != new_mtime and new_mtime >= self._initial_mtime:
+                if not self.ignored(path) and not self.discarded(path):
+                    LOGGER.info("Changed {}".format(path))
+                    self.repoChanged.emit(self._path)
+        except Exception as e:
+            LOGGER.error("Failed to update mtime '{}': {}".format(path, e))
+
+    def _onDirLoaded(self, path):
+        if self.ignored(path):
+            return
+        repo = None
+        idx = self._fs.index(path)
+        LOGGER.info("Tracking {}".format(path))
+        self._update(path)
+        for r in range(self._fs.rowCount(idx)):
+            repo = repo or git.Repo(self._working_dir)
+            childidx = self._fs.index(r, 0, idx)
+            childpath = self._fs.filePath(childidx)
+            if self._fs.canFetchMore(childidx) and not self.ignored(childpath, repo):
+                self._fs.fetchMore(childidx)
+            self._update(childpath)
+
+    def _onAboutToBeRemoved(self, parent, first, last):
+        for r in range(first, last + 1):
+            idx = self._fs.index(r, 0, parent)
+            path = self._fs.filePath(idx)
+            LOGGER.info("Removed {}".format(path))
+            self._mods.pop(path, None)
+            if not self.ignored(path) and not self.discarded(path):
+                self.repoChanged.emit(self._path)
+
+    def discarded(self, path):
+        """Returns true when changes to given path are discarded"""
+        if path in (self._working_dir, self._git_dir):
+            return True
+        isWithinGit = path.startswith(self._git_dir + os.sep)
+        if not isWithinGit and os.path.isdir(path):
+            return True
+        return False
+
+    def ignored(self, path, repo=None):
         """Returns true when given path is not part of given repository"""
         name = os.path.basename(path)
         ext = os.path.splitext(name)[1]
         if name in (".DS_Store", "__pycache__"):
             return True  # a known file type to be ignored
 
-        if path in (repo.working_dir, repo.git_dir):
+        if path in (self._working_dir, self._git_dir):
             return False
-        isWithinGit = path.startswith(repo.git_dir + os.sep)
-        isWithinWork = path.startswith(repo.working_dir + os.sep)
+
+        if os.path.isdir(path) and path.endswith(os.sep + "objects"):
+            inside_git_dir = git.Git(path).rev_parse(is_inside_git_dir=True) == "true"
+            if inside_git_dir:
+                return True
+
+        isWithinGit = path.startswith(self._git_dir + os.sep)
+        isWithinWork = path.startswith(self._working_dir + os.sep)
         if not isWithinGit and not isWithinWork:
             return True  # not part of this repository
 
         if isWithinGit:
-            gitRelPath = path[len(repo.git_dir) + 1:]
+            gitRelPath = path[len(self._git_dir) + 1:]
             if ext in (".lock", ".cache"):
                 return True  # discard changes to git lock/cache files
             if name == "hooks":
@@ -72,6 +156,7 @@ class RepoFsWatcher(QObject):
             if gitRelPath == "sourcetreeconfig":
                 return True  # discard SourceTree configuration
 
+        repo = repo or git.Repo(self._working_dir)
         submodulRoots = [r.abspath for r in repo.submodules]
         isSubmodule = [r for r in submodulRoots if path == r or path.startswith(r + os.sep)]
         if isSubmodule:
@@ -83,146 +168,3 @@ class RepoFsWatcher(QObject):
                 return True  # path is ignored in current repository
 
         return False
-
-    @pyqtSlot(str)
-    def startTracking(self, path):
-        self._repos += [git.Repo(path)]
-        self._updateTracking(self._repos[-1])
-
-    @pyqtSlot(str)
-    def stopTracking(self, path=None):
-        if path:
-            for repo in self._repos:
-                if repo.working_dir == path:
-                    self._stopTracking(repo, repo.working_dir)
-                    self._stopTracking(repo, repo.git_dir)
-                    self._repos.remove(repo)
-                    break
-        else:
-            LOGGER.info("Stop tracking...")
-            self._tracking_stopped = True
-            trackedPaths = self._fswatcher.files() + self._fswatcher.directories()
-            if trackedPaths:
-                self._fswatcher.removePaths(trackedPaths)
-            self._repos = []
-            LOGGER.info("Stopped tracking")
-
-    def _stopTracking(self, repo, path):
-        LOGGER.debug("Stop tracking\n\t in repo %s\n\tfor path %s", repo.working_dir, path)
-        untrackPaths = [p for p in self._fswatcher.files() + self._fswatcher.directories()
-                        if (p == path or p.startswith(path + os.sep)) \
-                        and not self.ignored(repo, p)]
-        untrackPaths += [path]
-        self._fswatcher.removePaths(untrackPaths)
-        nofFiles = len(self._fswatcher.files())
-        nofDirs = len(self._fswatcher.directories())
-        LOGGER.debug("Tracking %d files and %d directories", nofFiles, nofDirs)
-
-    def _updateTracking(self, repo, basepath=None):
-        if self._tracking_stopped:
-            return
-        if not basepath:
-            self._updateTracking(repo, repo.working_dir)
-            self._updateTracking(repo, repo.git_dir)
-            return
-        if not os.path.exists(basepath) or self.ignored(repo, basepath):
-            return
-        LOGGER.debug("Update tracking\n\t in repo %s\n\tfor path %s", repo.working_dir, basepath)
-        addTrackPaths = {basepath}
-        for root, dirs, files in os.walk(basepath):
-            if self._tracking_stopped:
-                return
-            if root not in self._dirSnapshots:
-                self._dirSnapshots[root] = {os.path.join(root, p) for p in dirs + files}
-            inside_git_dir = git.Git(root).rev_parse(is_inside_git_dir=True) == "true"
-            if inside_git_dir and "objects" in dirs:
-                dirs.remove("objects")
-            for ignoredDir in [path for path in dirs if
-                               self.ignored(repo, os.path.join(root, path))]:
-                dirs.remove(ignoredDir)
-                LOGGER.debug("IGN %s: %s", repo.working_dir, os.path.join(root, ignoredDir))
-            for ignoredFile in [path for path in files if
-                                self.ignored(repo, os.path.join(root, path))]:
-                files.remove(ignoredFile)
-                LOGGER.debug("IGN %s: %s", repo.working_dir, os.path.join(root, ignoredFile))
-            [addTrackPaths.add(os.path.join(root, path)) for path in dirs]
-            [addTrackPaths.add(os.path.join(root, path)) for path in files]
-        trackedPaths = set(self._fswatcher.files() + self._fswatcher.directories())
-        addTrackPaths -= trackedPaths
-        if not addTrackPaths:
-            return
-        failedPaths = self._fswatcher.addPaths(addTrackPaths)
-        for failedPath in failedPaths:
-            LOGGER.error("Failed to track path %s", failedPath)
-        trackedPaths = self._fswatcher.files() + self._fswatcher.directories()
-        trackedPaths.sort()
-        nofFiles = len(self._fswatcher.files())
-        nofDirs = len(self._fswatcher.directories())
-        LOGGER.debug("Tracking %d files and %d directories", nofFiles, nofDirs)
-
-    @pyqtSlot(str)
-    def _onFileChanged(self, path):
-        LOGGER.debug("FsWatcher._onFileChanged %s", path)
-        self._queueChangedPath(path)
-
-    def _compareDirSnapshots(self, path):
-        if not path in self._dirSnapshots:
-            self._dirSnapshots[path] = set()
-        if os.path.isdir(path):
-            paths = {os.path.join(path, p) for p in os.listdir(path)}
-        else:
-            paths = set()
-        addedPaths = paths.difference(self._dirSnapshots[path])
-        removedPaths = self._dirSnapshots[path].difference(paths)
-        self._dirSnapshots[path] = paths
-        return addedPaths | removedPaths
-
-    @pyqtSlot(str)
-    def _onDirChanged(self, path):
-        LOGGER.debug("FsWatcher._onDirChanged %s", path)
-        diffPaths = self._compareDirSnapshots(path)
-        if diffPaths:
-            self._queueChangedPath(path)
-        for dp in diffPaths:
-            self._queueTrackUpdate(dp)
-
-    def _queueChangedPath(self, path):
-        self._changedQueue.put(path)
-        QMetaObject.invokeMethod(self._flushChangedTimer, "start", Qt.QueuedConnection)
-
-    def _queueTrackUpdate(self, path):
-        self._updateTrackQueue.put(path)
-        QMetaObject.invokeMethod(self._updateTrackTimer, "start", Qt.QueuedConnection)
-
-    @pyqtSlot()
-    def _onUpdateTrack(self):
-        # gather queued track updates, eliminate duplicates and take the top-most
-        # of all directory trees
-        paths = set()
-        while not self._updateTrackQueue.empty():
-            path = self._updateTrackQueue.get_nowait()
-            isChild = [p for p in paths if path.startswith(p + os.sep)]
-            children = set([p for p in paths if p.startswith(path + os.sep)])
-            paths -= children
-            if not isChild:
-                paths.add(path)
-        for path in paths:
-            [self._updateTracking(repo, path) for repo in self._repos]
-
-    @pyqtSlot()
-    def _onFlushChanged(self):
-        """Handle all queued path changes and filter them to forward only one event by repository"""
-        # gather queued files and eliminate duplicates
-        paths = set()
-        while not self._changedQueue.empty():
-            paths.add(self._changedQueue.get_nowait())
-        # handle all the changed paths, start with the longest root directory, i.e. submodules
-        paths = list(paths)
-        roots = set()
-        for repo in self._repos:
-            repoPaths = [path for path in paths if not self.ignored(repo, path)]
-            if repoPaths:
-                roots.add(repo.working_dir)
-        for root in roots:
-            LOGGER.info("Repository filesystem change detected: %s", root)
-            self.repoChanged.emit(root)
