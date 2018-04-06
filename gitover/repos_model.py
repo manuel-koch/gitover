@@ -39,7 +39,7 @@ import git
 from git.cmd import handle_process_output
 from git.util import finalize_process
 
-from PyQt5.QtCore import QModelIndex, pyqtSlot, Q_ENUMS, QTimer, QSettings
+from PyQt5.QtCore import QModelIndex, pyqtSlot, Q_ENUMS, QTimer, QSettings, QRunnable, QThreadPool
 from PyQt5.QtCore import QVariant
 from PyQt5.QtCore import Qt, pyqtProperty, pyqtSignal, QObject
 from PyQt5.QtCore import QAbstractItemModel
@@ -180,11 +180,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
     @pyqtSlot()
     def stopWorker(self):
         LOGGER.debug("Stopping workers...")
-        for repo in self._repos:
-            repo.stopWorker()
-
         self._fsWatcher.stopTracking()
-
         if self._workerThread.isRunning():
             self._workerThread.quit()
             self._workerThread.wait()
@@ -214,8 +210,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
     def addRepoByPath(self, path, saveAsRecent=False):
         if self._isRepo(path):
             repo = Repo(path)
-            if not self.addRepo(repo, saveAsRecent):
-                repo.stopWorker()
+            self.addRepo(repo, saveAsRecent)
 
     def addRepo(self, repo, saveAsRecent=False):
         if any([r.path == repo.path for r in self._repos]):
@@ -254,8 +249,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
             return
         path, name = self._queued_path.pop(0)
         repo = Repo(path, name)
-        if not self.addRepo(repo):
-            repo.stopWorker()
+        self.addRepo(repo)
         self._queueTimer.start()
 
     def _onRepoChanged(self, path):
@@ -460,11 +454,49 @@ class GitStatus(object):
             LOGGER.exception("Failed to detect branches that are already merged to trunk")
 
 
+class WorkerSlot:
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._runnables = []
+
+    def schedule(self, func, *args, **kwargs):
+        with self._lock:
+            runnable = WorkerRunnable(self, func, *args, **kwargs)
+            self._runnables.append(runnable)
+            if len(self._runnables) == 1:
+                self._next()
+
+    def _next(self):
+        if self._runnables:
+            QThreadPool.globalInstance().start(self._runnables[0])
+
+    def done(self, runnable):
+        with self._lock:
+            self._runnables.remove(runnable)
+            self._next()
+
+
+class WorkerRunnable(QRunnable):
+    def __init__(self, slot, func, *args, **kwargs):
+        super().__init__()
+        assert isinstance(slot, WorkerSlot)
+        self._slot = slot
+        self._func = func
+        self._args = args
+        self._kwargs = kwargs
+
+    def run(self):
+        try:
+            self._func(*self._args, **self._kwargs)
+        except:
+            LOGGER.exception("Worker runnable failed")
+        finally:
+            self._slot.done(self)
+
+
 class GitStatusWorker(QObject):
     """Host git status update within worker thread"""
-
-    # signal gets emitted to trigger updating given GitStatus
-    updatestatus = pyqtSignal(object)
 
     # signal gets emitted when starting/stopping to update status
     statusprogress = pyqtSignal(bool)
@@ -472,11 +504,10 @@ class GitStatusWorker(QObject):
     # signal gets emitted when given GitStatus has been updated
     statusupdated = pyqtSignal(object)
 
-    def __init__(self):
+    def __init__(self, workerSlot):
         super().__init__()
-        self.updatestatus.connect(self._onUpdateStatus)
+        self._workerSlot = workerSlot
 
-    @pyqtSlot(object)
     def _onUpdateStatus(self, status):
         """Update selected GitStatus of a git repo"""
         self.statusprogress.emit(True)
@@ -487,6 +518,11 @@ class GitStatusWorker(QObject):
         self.statusupdated.emit(status)
         self.statusprogress.emit(False)
 
+    @pyqtSlot(object)
+    def updateStatus(self, status):
+        """Update selected GitStatus of a git repo"""
+        self._workerSlot.schedule(self._onUpdateStatus, status)
+
 
 class GitFetchWorker(QObject):
     """Host git fetch action within worker thread"""
@@ -494,9 +530,6 @@ class GitFetchWorker(QObject):
     concurrent_fetch_count = 0
     concurrent_fetch_lock = threading.Lock()
     max_concurrent_fetch_count = 8
-
-    # signal gets emitted to trigger updating given repo root path
-    fetch = pyqtSignal(str)
 
     # signal gets emitted when starting/stopping fetch action
     fetchprogress = pyqtSignal(bool)
@@ -507,13 +540,13 @@ class GitFetchWorker(QObject):
     # signal gets emitted when an error happened during pull
     error = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, workerSlot):
         super().__init__()
-        self.fetch.connect(self._onFetch)
+        self._workerSlot = workerSlot
 
     def _aquireFetchSlot(self):
-        """Try to aquire fetch slot, returns true on success.
-        Caller should retry with delay to aquire again."""
+        """Try to acquire fetch slot, returns true on success.
+        Caller should retry with delay to acquire again."""
         with GitFetchWorker.concurrent_fetch_lock:
             if GitFetchWorker.concurrent_fetch_count > GitFetchWorker.max_concurrent_fetch_count:
                 return False
@@ -526,7 +559,10 @@ class GitFetchWorker(QObject):
             if GitFetchWorker.concurrent_fetch_count > 0:
                 GitFetchWorker.concurrent_fetch_count -= 1
 
-    @pyqtSlot(str)
+    def fetch(self, path):
+        """Fetch selected repo"""
+        self._workerSlot.schedule(self._onFetch, path)
+
     def _onFetch(self, path):
         """Fetch selected repo"""
         self.fetchprogress.emit(True)
@@ -553,9 +589,6 @@ class GitFetchWorker(QObject):
 class GitPullWorker(QObject):
     """Host git pull action within worker thread"""
 
-    # signal gets emitted to trigger pulling given repo root path
-    pull = pyqtSignal(str)
-
     # signal gets emitted when starting/stopping pull action
     pullprogress = pyqtSignal(bool)
 
@@ -565,9 +598,14 @@ class GitPullWorker(QObject):
     # signal gets emitted when an error happened during pull
     error = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, workerSlot):
         super().__init__()
-        self.pull.connect(self._onPull)
+        self._workerSlot = workerSlot
+
+    @pyqtSlot(str)
+    def pull(self, path):
+        """Pull selected repo"""
+        self._workerSlot.schedule(self._onPull, path)
 
     @pyqtSlot(str)
     def _onPull(self, path):
@@ -613,21 +651,6 @@ class GitPullWorker(QObject):
 class GitCheckoutWorker(QObject):
     """Host git checkout action within worker thread"""
 
-    # signal gets emitted to trigger checkout given repo branch
-    checkoutBranch = pyqtSignal(str)
-
-    # signal gets emitted to trigger creating given repo branch
-    createBranch = pyqtSignal(str)
-
-    # signal gets emitted to trigger checkout given path in repo
-    checkoutPath = pyqtSignal(str)
-
-    # signal gets emitted to trigger staging given path in repo
-    addPath = pyqtSignal(str)
-
-    # signal gets emitted to trigger un-staging given path in repo
-    resetPath = pyqtSignal(str)
-
     # signal gets emitted when starting/stopping pull action
     checkoutprogress = pyqtSignal(bool)
 
@@ -637,16 +660,15 @@ class GitCheckoutWorker(QObject):
     # signal gets emitted when an error happened during pull
     error = pyqtSignal(str)
 
-    def __init__(self, path):
+    def __init__(self, workerSlot, path):
         super().__init__()
+        self._workerSlot = workerSlot
         self._path = path
-        self.checkoutBranch.connect(self._onCheckoutBranch)
-        self.createBranch.connect(self._onCreateBranch)
-        self.checkoutPath.connect(self._onCheckoutPath)
-        self.addPath.connect(self._onAddPath)
-        self.resetPath.connect(self._onResetPath)
 
-    @pyqtSlot(str)
+    def checkoutBranch(self, branch):
+        """Checkout selected (remote) branch and create a (local) branch if necessary"""
+        self._workerSlot.schedule(self._onCheckoutBranch, branch)
+
     def _onCheckoutBranch(self, branch):
         """Checkout selected (remote) branch and create a (local) branch if necessary"""
         try:
@@ -689,7 +711,10 @@ class GitCheckoutWorker(QObject):
         finally:
             self.checkoutprogress.emit(False)
 
-    @pyqtSlot(str)
+    def createBranch(self, branch):
+        """Checkout a new branch"""
+        self._workerSlot.schedule(self._onCreateBranch, branch)
+
     def _onCreateBranch(self, branch):
         """Checkout a new branch"""
         try:
@@ -712,7 +737,10 @@ class GitCheckoutWorker(QObject):
         finally:
             self.checkoutprogress.emit(False)
 
-    @pyqtSlot(str)
+    def checkoutPath(self, path):
+        """Checkout selected path reverting any local changes"""
+        self._workerSlot.schedule(self._onCheckoutPath, path)
+
     def _onCheckoutPath(self, path):
         """Checkout selected path reverting any local changes"""
         try:
@@ -732,7 +760,10 @@ class GitCheckoutWorker(QObject):
         finally:
             self.checkoutprogress.emit(False)
 
-    @pyqtSlot(str)
+    def addPath(self, path):
+        """Add selected path to staging"""
+        self._workerSlot.schedule(self._onAddPath, path)
+
     def _onAddPath(self, path):
         """Add selected path to staging"""
         try:
@@ -749,7 +780,9 @@ class GitCheckoutWorker(QObject):
         finally:
             self.checkoutprogress.emit(False)
 
-    @pyqtSlot(str)
+    def resetPath(self, path):
+        self._workerSlot.schedule(self._onResetPath, path)
+
     def _onResetPath(self, path):
         """Reset / un-stage selected path"""
         try:
@@ -775,21 +808,6 @@ class GitCheckoutWorker(QObject):
 class GitRebaseWorker(QObject):
     """Host git rebase action within worker thread"""
 
-    # signal gets emitted to trigger rebase onto given reference
-    rebase = pyqtSignal(str)
-
-    # signal gets emitted to trigger skip of current patch while rebasing
-    skip = pyqtSignal()
-
-    # signal gets emitted to trigger continue rebasing
-    cont = pyqtSignal()
-
-    # signal gets emitted to trigger abort of rebase
-    abort = pyqtSignal()
-
-    # signal gets emitted to trigger check if rebase is still in progress
-    check = pyqtSignal()
-
     # signal gets emitted when starting/stopping rebase action
     rebaseprogress = pyqtSignal(bool)
 
@@ -799,22 +817,20 @@ class GitRebaseWorker(QObject):
     # signal gets emitted when an error/conflict happened during rebase
     error = pyqtSignal(str)
 
-    def __init__(self, path):
+    def __init__(self, workerSlot, path):
         super().__init__()
+        self._workerSlot = workerSlot
         self._path = path
         self._repo = git.Repo(self._path)
         self._rebasing = False
         self._rebaseStash = ""
         self._testPaths = [os.path.join(self._repo.git_dir, "rebase-merge", "done"),
                            os.path.join(self._repo.git_dir, "rebase-apply", "rebasing")]
-        self.rebase.connect(self._onStartRebase)
-        self.skip.connect(self._onSkipRebase)
-        self.cont.connect(self._onContinueRebase)
-        self.abort.connect(self._onAbortRebase)
-        self.check.connect(self.checkRebasing)
 
-    @pyqtSlot(result=bool)
     def checkRebasing(self):
+        self._workerSlot.schedule(self._onCheckRebasing)
+
+    def _onCheckRebasing(self):
         """Check whether rebase is still in progress"""
         rebasing = any([os.path.exists(p) for p in self._testPaths])
         if self._rebasing != rebasing:
@@ -846,7 +862,9 @@ class GitRebaseWorker(QObject):
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
         self._rebaseStash = ""
 
-    @pyqtSlot(str)
+    def startRebase(self, ref):
+        self._workerSlot.schedule(self._onStartRebase, ref)
+
     def _onStartRebase(self, ref):
         """Rebase onto selected reference"""
         try:
@@ -862,8 +880,7 @@ class GitRebaseWorker(QObject):
 
             self._stash()
 
-            proc = self._repo.git.rebase(ref,
-                                         with_extended_output=True, as_process=True)
+            proc = self._repo.git.rebase(ref, with_extended_output=True, as_process=True)
             try:
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
             except git.exc.GitCommandError as e:
@@ -876,7 +893,9 @@ class GitRebaseWorker(QObject):
         except:
             LOGGER.exception("Failed to rebase git repo at {}".format(self._path))
 
-    @pyqtSlot()
+    def continueRebase(self):
+        self._workerSlot.schedule(self._onContinueRebase)
+
     def _onContinueRebase(self):
         """Continue rebase"""
         try:
@@ -898,7 +917,9 @@ class GitRebaseWorker(QObject):
         except:
             LOGGER.exception("Failed to continue rebase git repo at {}".format(self._path))
 
-    @pyqtSlot()
+    def skipRebase(self):
+        self._workerSlot.schedule(self._onSkipRebase)
+
     def _onSkipRebase(self):
         """Skip current patch while rebasing"""
         try:
@@ -918,7 +939,9 @@ class GitRebaseWorker(QObject):
         except:
             LOGGER.exception("Failed to skip rebase git repo at {}".format(self._path))
 
-    @pyqtSlot()
+    def abortRebase(self):
+        self._workerSlot.schedule(self._onAbortRebase)
+
     def _onAbortRebase(self):
         """Abort rebase"""
         try:
@@ -947,9 +970,6 @@ class GitRebaseWorker(QObject):
 class GitPushWorker(QObject):
     """Host git push action within worker thread"""
 
-    # signal gets emitted to trigger pushing given repo branch w/ or w/o force
-    pushBranch = pyqtSignal(str, bool)
-
     # signal gets emitted when starting/stopping push action
     pushprogress = pyqtSignal(bool)
 
@@ -959,12 +979,14 @@ class GitPushWorker(QObject):
     # signal gets emitted when an error happened during push
     error = pyqtSignal(str)
 
-    def __init__(self, path):
+    def __init__(self, workerSlot, path):
         super().__init__()
+        self._workerSlot = workerSlot
         self._path = path
-        self.pushBranch.connect(self._onPushBranch)
 
-    @pyqtSlot(str, bool)
+    def pushBranch(self):
+        self._workerSlot.schedule(self._onPushBranch)
+
     def _onPushBranch(self, branch, force=False):
         """Push selected branch to remote, setting upstream when no tracking branch is set yet"""
         try:
@@ -1172,50 +1194,40 @@ class Repo(QObject, QmlTypeMixin):
 
     def __init__(self, path, name="", parent=None):
         super().__init__(parent)
-        self.destroyed.connect(self.stopWorker)
-
         self._path = os.path.normpath(os.path.abspath(path))
         self._name = name or os.path.basename(self._path)
 
         self._changes = ChangedFilesModel(self)
         self._output = OutputModel(self)
 
-        workerName = "workerThread-{}-{}".format(id(self), self._name)
-        self._workerThread = QThread(self, objectName=workerName)
-        self._workerThread.start()
+        self._workerSlot = WorkerSlot()
 
-        self._statusWorker = GitStatusWorker()
-        self._statusWorker.moveToThread(self._workerThread)
+        self._statusWorker = GitStatusWorker(self._workerSlot)
         self._statusWorker.statusprogress.connect(self._onUpdating)
         self._statusWorker.statusupdated.connect(self._onStatusUpdated)
 
-        self._fetchWorker = GitFetchWorker()
-        self._fetchWorker.moveToThread(self._workerThread)
+        self._fetchWorker = GitFetchWorker(self._workerSlot)
         self._fetchWorker.fetchprogress.connect(self._setFetching)
         self._fetchWorker.output.connect(self._output.appendOutput)
         self._fetchWorker.error.connect(self.error)
 
-        self._pullWorker = GitPullWorker()
-        self._pullWorker.moveToThread(self._workerThread)
+        self._pullWorker = GitPullWorker(self._workerSlot)
         self._pullWorker.pullprogress.connect(self._setPulling)
         self._pullWorker.output.connect(self._output.appendOutput)
         self._pullWorker.error.connect(self.error)
 
-        self._checkoutWorker = GitCheckoutWorker(self._path)
-        self._checkoutWorker.moveToThread(self._workerThread)
+        self._checkoutWorker = GitCheckoutWorker(self._workerSlot, self._path)
         self._checkoutWorker.checkoutprogress.connect(self._setCheckingOut)
         self._checkoutWorker.output.connect(self._output.appendOutput)
         self._checkoutWorker.error.connect(self.error)
 
-        self._rebaseWorker = GitRebaseWorker(self._path)
-        self._rebaseWorker.moveToThread(self._workerThread)
+        self._rebaseWorker = GitRebaseWorker(self._workerSlot, self._path)
         self._rebaseWorker.rebaseprogress.connect(self._setRebasing)
         self._rebaseWorker.output.connect(self._output.appendOutput)
         self._rebaseWorker.error.connect(self.triggerUpdate)
         self._rebaseWorker.error.connect(self.error)
 
-        self._pushWorker = GitPushWorker(self._path)
-        self._pushWorker.moveToThread(self._workerThread)
+        self._pushWorker = GitPushWorker(self._workerSlot, self._path)
         self._pushWorker.pushprogress.connect(self._setPushing)
         self._pushWorker.output.connect(self._output.appendOutput)
         self._pushWorker.error.connect(self.error)
@@ -1272,14 +1284,6 @@ class Repo(QObject, QmlTypeMixin):
     def output(self):
         return self._output
 
-    @pyqtSlot()
-    def stopWorker(self):
-        if self._workerThread.isRunning():
-            LOGGER.debug("Stopping worker of {}...".format(self._path))
-            self._workerThread.quit()
-            self._workerThread.wait()
-            LOGGER.debug("Stopped worker of {}".format(self._path))
-
     @pyqtProperty(bool, notify=updatingChanged)
     def updating(self):
         return self._updating
@@ -1296,7 +1300,7 @@ class Repo(QObject, QmlTypeMixin):
         if self._updateTriggered:
             LOGGER.debug("Status update already triggered...")
             return
-        self._statusWorker.updatestatus.emit(GitStatus(self._path))
+        self._statusWorker.updateStatus(GitStatus(self._path))
         self._updateTriggered = True
 
     @pyqtProperty(bool, notify=fetchingChanged)
@@ -1316,7 +1320,7 @@ class Repo(QObject, QmlTypeMixin):
         if self._fetchTriggered:
             LOGGER.debug("Fetch already triggered...")
             return
-        self._fetchWorker.fetch.emit(self._path)
+        self._fetchWorker.fetch(self._path)
         self._fetchTriggered = True
 
     @pyqtProperty(bool, notify=pullingChanged)
@@ -1336,7 +1340,7 @@ class Repo(QObject, QmlTypeMixin):
         if self._pullTriggered:
             LOGGER.debug("Pull already triggered...")
             return
-        self._pullWorker.pull.emit(self._path)
+        self._pullWorker.pull(self._path)
         self._pullTriggered = True
 
     @pyqtProperty(bool, notify=checkingoutChanged)
@@ -1356,7 +1360,7 @@ class Repo(QObject, QmlTypeMixin):
         if self._checkoutTriggered:
             LOGGER.debug("Checkout already triggered...")
             return
-        self._checkoutWorker.checkoutBranch.emit(branch)
+        self._checkoutWorker.checkoutBranch(branch)
         self._checkoutTriggered = True
 
     @pyqtSlot(str)
@@ -1364,7 +1368,7 @@ class Repo(QObject, QmlTypeMixin):
         if self._checkoutTriggered:
             LOGGER.debug("Checkout already triggered...")
             return
-        self._checkoutWorker.createBranch.emit(branch)
+        self._checkoutWorker.createBranch(branch)
         self._checkoutTriggered = True
 
     @pyqtProperty(bool, notify=rebasingChanged)
@@ -1384,7 +1388,7 @@ class Repo(QObject, QmlTypeMixin):
         if self._rebaseTriggered:
             LOGGER.debug("Rebase already triggered...")
             return
-        self._rebaseWorker.rebase.emit(ref)
+        self._rebaseWorker.startRebase(ref)
         self._rebaseTriggered = True
 
     @pyqtProperty(bool, notify=pushingChanged)
@@ -1404,7 +1408,7 @@ class Repo(QObject, QmlTypeMixin):
         if self._pushTriggered:
             LOGGER.debug("Push already triggered...")
             return
-        self._pushWorker.pushBranch.emit(branch, force)
+        self._pushWorker.pushBranch(branch, force)
         self._pushTriggered = True
 
     @pyqtSlot(object)
@@ -1437,7 +1441,7 @@ class Repo(QObject, QmlTypeMixin):
                                  conflicting=sorteditems(status.conflicts),
                                  untracked=sorteditems(status.untracked))
 
-        self._rebaseWorker.check.emit()
+        self._rebaseWorker.checkRebasing()
         self.statusUpdated.emit()
 
     def _config(self):
@@ -1469,16 +1473,13 @@ class Repo(QObject, QmlTypeMixin):
             self.triggerRebase(self._trunk_branch)
             return
         if name == "__rebasecont":
-            self._rebaseWorker.cont.emit()
+            self._rebaseWorker.continueRebase()
             return
         if name == "__rebaseskip":
-            self._rebaseWorker.skip.emit()
+            self._rebaseWorker.skipRebase()
             return
         if name == "__rebaseabort":
-            self._rebaseWorker.abort.emit()
-            return
-        if name == "__revert":
-            self._checkoutWorker.checkoutPath.emit(arg)
+            self._rebaseWorker.abortRebase()
             return
 
         tool = cfg.tool(name)
@@ -1493,17 +1494,17 @@ class Repo(QObject, QmlTypeMixin):
         cfg = self._config()
 
         if name == "__revert":
-            self._checkoutWorker.checkoutPath.emit(path)
+            self._checkoutWorker.checkoutPath(path)
             return
         if name == "__discard":
             os.unlink(os.path.join(self._path, path))
             self.triggerUpdate()
             return
         if name == "__stage":
-            self._checkoutWorker.addPath.emit(path)
+            self._checkoutWorker.addPath(path)
             return
         if name == "__unstage":
-            self._checkoutWorker.resetPath.emit(path)
+            self._checkoutWorker.resetPath(path)
             return
 
         tool = cfg.statusTool(status, name)

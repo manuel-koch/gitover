@@ -24,7 +24,7 @@ Main window of git overview.
 import logging
 
 from PyQt5 import QtCore
-from PyQt5.QtCore import Qt, qInstallMessageHandler
+from PyQt5.QtCore import Qt, qInstallMessageHandler, QThreadPool
 from PyQt5.QtCore import QThread
 from PyQt5.QtCore import QSettings
 from PyQt5.QtGui import QGuiApplication, QIcon
@@ -63,7 +63,9 @@ def run_gui(repo_paths, watch_filesystem):
     app.setApplicationName("GitOver")
     app.setApplicationVersion("{}".format(gitover_version))
     app.setWindowIcon(QIcon(':/icon.png'))
+
     QThread.currentThread().setObjectName('mainThread')
+    QThreadPool.globalInstance().setMaxThreadCount(15)
 
     LOGGER.info("{} ({})".format(app.applicationName(), app.applicationVersion()))
 
