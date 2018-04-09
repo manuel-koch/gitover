@@ -32,6 +32,7 @@ Item {
     RowLayout {
         id: theRow
         anchors.fill: parent
+        spacing:      0
 
         Text {
             id: theLabel

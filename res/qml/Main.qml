@@ -183,7 +183,7 @@ ApplicationWindow {
                 for( var cols=1; cols<=count; cols++ ) {
                     var w = calcCellWidth(cols)
                     var h = calcCellHeight(cols)
-                    if( w > minCellHeight*2 && h > minCellHeight ) {
+                    if( w > minCellHeight*1.5 && h > minCellHeight ) {
                         dims.push({"cols": cols, "width": w, "height": h})
                     }
                 }
