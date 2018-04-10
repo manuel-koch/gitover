@@ -60,17 +60,29 @@ class RepoTracker(QObject):
     def __init__(self, path, parent=None):
         super().__init__(parent)
         self._path = path
+        self._name = os.path.basename(self._path)
         repo = git.Repo(self._path)
         self._working_dir = repo.working_dir
         self._git_dir = repo.git_dir
+        distinct_git_dir = not (self._git_dir + os.sep).startswith(self._working_dir)
         self._initial_mtime = time.time()
         self._mods = {}
-        self._fs = QFileSystemModel(self)
-        self._fs.setFilter(QDir.AllEntries | QDir.Hidden | QDir.NoDot | QDir.NoDotDot)
-        self._fs.setReadOnly(True)
-        self._fs.setRootPath(self._path)
-        self._fs.directoryLoaded.connect(self._onDirLoaded)
-        self._fs.rowsAboutToBeRemoved.connect(self._onAboutToBeRemoved)
+        self._fsRoot = self._createFsModel(self._working_dir,
+                                           self._onRootDirLoaded, self._onRootAboutToBeRemoved)
+        if distinct_git_dir:
+            self._fsGit = self._createFsModel(self._git_dir,
+                                              self._onGitDirLoaded, self._onGitAboutToBeRemoved)
+        else:
+            self._fsGit = None
+
+    def _createFsModel(self, path, onDirLoaded, onAboutToBeRemoved):
+        fs = QFileSystemModel(self)
+        fs.setFilter(QDir.AllEntries | QDir.Hidden | QDir.NoDot | QDir.NoDotDot)
+        fs.setReadOnly(True)
+        fs.setRootPath(path)
+        fs.directoryLoaded.connect(onDirLoaded)
+        fs.rowsAboutToBeRemoved.connect(onAboutToBeRemoved)
+        return fs
 
     def _update(self, path):
         try:
@@ -79,31 +91,43 @@ class RepoTracker(QObject):
             self._mods[path] = new_mtime
             if old_mtime != new_mtime and new_mtime >= self._initial_mtime:
                 if not self.ignored(path) and not self.discarded(path):
-                    LOGGER.info("Changed {}".format(path))
+                    LOGGER.info("Changed ({}): {}".format(self._name, path))
                     self.repoChanged.emit(self._path)
         except Exception as e:
             LOGGER.error("Failed to update mtime '{}': {}".format(path, e))
 
-    def _onDirLoaded(self, path):
+    def _onRootDirLoaded(self, path):
+        self._onDirLoaded(self._fsRoot, path)
+
+    def _onGitDirLoaded(self, path):
+        self._onDirLoaded(self._fsGit, path)
+
+    def _onDirLoaded(self, fs, path):
         if self.ignored(path):
             return
         repo = None
-        idx = self._fs.index(path)
-        LOGGER.info("Tracking {}".format(path))
+        idx = fs.index(path)
+        LOGGER.info("Tracking ({}): {}".format(self._name, path))
         self._update(path)
-        for r in range(self._fs.rowCount(idx)):
+        for r in range(fs.rowCount(idx)):
             repo = repo or git.Repo(self._working_dir)
-            childidx = self._fs.index(r, 0, idx)
-            childpath = self._fs.filePath(childidx)
-            if self._fs.canFetchMore(childidx) and not self.ignored(childpath, repo):
-                self._fs.fetchMore(childidx)
+            childidx = fs.index(r, 0, idx)
+            childpath = fs.filePath(childidx)
+            if fs.canFetchMore(childidx) and not self.ignored(childpath, repo):
+                fs.fetchMore(childidx)
             self._update(childpath)
 
-    def _onAboutToBeRemoved(self, parent, first, last):
+    def _onRootAboutToBeRemoved(self, parent, first, last):
+        self._onAboutToBeRemoved(self._fsRoot, parent, first, last)
+
+    def _onGitAboutToBeRemoved(self, parent, first, last):
+        self._onAboutToBeRemoved(self._fsGit, parent, first, last)
+
+    def _onAboutToBeRemoved(self, fs, parent, first, last):
         for r in range(first, last + 1):
-            idx = self._fs.index(r, 0, parent)
-            path = self._fs.filePath(idx)
-            LOGGER.info("Removed {}".format(path))
+            idx = fs.index(r, 0, parent)
+            path = fs.filePath(idx)
+            LOGGER.info("Removed ({}): {}".format(self._name, path))
             self._mods.pop(path, None)
             if not self.ignored(path) and not self.discarded(path):
                 self.repoChanged.emit(self._path)
