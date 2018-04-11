@@ -508,6 +508,11 @@ class GitStatusWorker(QObject):
         super().__init__()
         self._workerSlot = workerSlot
 
+    @pyqtSlot(object)
+    def updateStatus(self, status):
+        """Update selected GitStatus of a git repo"""
+        self._workerSlot.schedule(self._onUpdateStatus, status)
+
     def _onUpdateStatus(self, status):
         """Update selected GitStatus of a git repo"""
         self.statusprogress.emit(True)
@@ -517,11 +522,6 @@ class GitStatusWorker(QObject):
             LOGGER.exception("Failed to update git status at {}".format(status.path))
         self.statusupdated.emit(status)
         self.statusprogress.emit(False)
-
-    @pyqtSlot(object)
-    def updateStatus(self, status):
-        """Update selected GitStatus of a git repo"""
-        self._workerSlot.schedule(self._onUpdateStatus, status)
 
 
 class GitFetchWorker(QObject):
@@ -984,8 +984,8 @@ class GitPushWorker(QObject):
         self._workerSlot = workerSlot
         self._path = path
 
-    def pushBranch(self):
-        self._workerSlot.schedule(self._onPushBranch)
+    def pushBranch(self, branch, force=False):
+        self._workerSlot.schedule(self._onPushBranch, branch, force=force)
 
     def _onPushBranch(self, branch, force=False):
         """Push selected branch to remote, setting upstream when no tracking branch is set yet"""
