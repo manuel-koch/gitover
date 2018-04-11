@@ -86,13 +86,16 @@ class RepoTracker(QObject):
 
     def _update(self, path):
         try:
-            old_mtime = self._mods.get(path, 0)
-            new_mtime = os.stat(path).st_mtime
-            self._mods[path] = new_mtime
-            if old_mtime != new_mtime and new_mtime >= self._initial_mtime:
-                if not self.ignored(path) and not self.discarded(path):
-                    LOGGER.info("Changed ({}): {}".format(self._name, path))
-                    self.repoChanged.emit(self._path)
+            if os.path.exists(path):
+                old_mtime = self._mods.get(path, 0)
+                new_mtime = os.stat(path).st_mtime
+                self._mods[path] = new_mtime
+                if old_mtime != new_mtime and new_mtime >= self._initial_mtime:
+                    if not self.ignored(path) and not self.discarded(path):
+                        LOGGER.info("Changed ({}): {}".format(self._name, path))
+                        self.repoChanged.emit(self._path)
+            else:
+                self._mods.pop(path, None)
         except Exception as e:
             LOGGER.error("Failed to update mtime '{}': {}".format(path, e))
 
