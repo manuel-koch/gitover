@@ -35,7 +35,7 @@ from gitover.ui.resources import gitover_commit_sha, gitover_version
 from gitover.repos_model import ReposModel, Repo, ChangedFilesModel, OutputModel
 from gitover.formatter import GitDiffFormatter
 from gitover.res_helper import getResourceUrl
-
+from gitover.wakeup import WakeupWatcher
 
 LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +52,20 @@ def messageHandler(msgType, context, msg):
     logfunc("{}({}): {}".format(context.file, context.line, msg))
 
 
+def position_window(wnd, x, y):
+    if x is not None:
+        wnd.setProperty("x", x)
+    if y is not None:
+        wnd.setProperty("y", y)
+
+
+def reposition_window(wnd):
+    x = wnd.x()
+    y = wnd.y()
+    position_window(wnd, x + 1, y + 1)
+    position_window(wnd, x, y)
+
+
 def run_gui(repo_paths, watch_filesystem):
     """Run GUI application"""
     LOGGER.info("Starting...")
@@ -66,6 +80,8 @@ def run_gui(repo_paths, watch_filesystem):
 
     QThread.currentThread().setObjectName('mainThread')
     QThreadPool.globalInstance().setMaxThreadCount(15)
+
+    wakeupWatcher = WakeupWatcher()
 
     LOGGER.info("{} ({})".format(app.applicationName(), app.applicationVersion()))
 
@@ -100,10 +116,10 @@ def run_gui(repo_paths, watch_filesystem):
     wnd.setProperty("title", app.applicationName())
     wnd.setProperty("width", w)
     wnd.setProperty("height", h)
-    if x is not None:
-        wnd.setProperty("x", x)
-    if y is not None:
-        wnd.setProperty("y", y)
+    position_window(wnd, x, y)
+
+    # workaround context menus at wrong position after wakeup from sleeping !?
+    wakeupWatcher.awake.connect(lambda: reposition_window(wnd))
 
     # Run the application
     result = app.exec_()
@@ -121,6 +137,7 @@ def run_gui(repo_paths, watch_filesystem):
     wnd = None
     engine = None
     repos = None
+    wakeupWatcher = None
     app = None
 
     LOGGER.info("Done.")
