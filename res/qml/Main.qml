@@ -221,6 +221,16 @@ ApplicationWindow {
                 }
             }
             Tab {
+                title: "History"
+                BranchDetails {
+                    Layout.fillWidth: true
+                    repository:       theRepoGrid.repository
+                    title:            repository != null ? " Branch : " + repository.branch : ""
+                    commits:          repository != null ? repository.commits : null
+                    visible:          repository != null
+                }
+            }
+            Tab {
                 title: "Status"
                 SplitView {
                     RepoStatusList {

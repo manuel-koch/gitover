@@ -262,6 +262,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
 
 
 CommitDetail = NamedTuple("CommitDetail", (("rev", str),
+                                           ("date", str),
                                            ("user", str),
                                            ("msg", str),
                                            ("changes", list)))
@@ -285,7 +286,7 @@ class CachedCommitDetails(object):
         shortrev = repo.git.rev_parse(c.hexsha, short=8)
         changes = repo.git.diff_tree(rev, no_commit_id=True, name_status=True, r=True).split("\n")
         changes = [CommitChange(*c.split("\t")) for c in changes if c.strip()]
-        cd = CommitDetail(shortrev, c.author.name, msg, changes)
+        cd = CommitDetail(shortrev, str(c.committed_datetime), c.author.name, msg, changes)
         self._cache[rev] = cd
         return cd
 
@@ -314,6 +315,7 @@ class GitStatus(object):
         self.branches = []  # all local branches
         self.remoteBranches = []  # all remote branches that could be checked-out
         self.mergedToTrunkBranches = []  # all local branches that have been merged to trunk
+        self.commits = []
         self.trackingBranch = ""  # tracking branch of current branch
         self.trackingBranchAhead = []  # list of commits that tracking branch is ahead of current branch
         self.trackingBranchBehind = []  # list of commits that tracking branch is behind of current branch
@@ -357,6 +359,13 @@ class GitStatus(object):
         except:
             LOGGER.exception("Invalid repository at {}".format(self.path))
             return
+
+        try:
+            self.commits = [c.hexsha for c in repo.iter_commits(max_count=50)]
+            for c in self.commits:
+                CACHED_COMMIT_DETAILS.get(c, repo)
+        except TypeError:
+            LOGGER.exception("Failed to get commits for {}".format(self.path))
 
         try:
             self.branch = repo.active_branch.name
@@ -1162,6 +1171,7 @@ class Repo(QObject, QmlTypeMixin):
     branchesChanged = pyqtSignal("QStringList")
     remoteBranchesChanged = pyqtSignal("QStringList")
     mergedToTrunkBranchesChanged = pyqtSignal("QStringList")
+    commitsChanged = pyqtSignal("QStringList")
 
     trackingBranchChanged = pyqtSignal(str)
     trackingBranchAheadChanged = pyqtSignal(int)
@@ -1237,6 +1247,7 @@ class Repo(QObject, QmlTypeMixin):
         self._branches = []
         self._remote_branches = []
         self._merged_to_trunk_branches = []
+        self._commits = []
 
         self._tracking_branch = ""
         self._tracking_branch_ahead_commits = []
@@ -1423,6 +1434,7 @@ class Repo(QObject, QmlTypeMixin):
         self.branches = sorteditems(status.branches)
         self.remoteBranches = sorteditems(status.remoteBranches)
         self.mergedToTrunkBranches = sorteditems(status.mergedToTrunkBranches)
+        self.commits = status.commits
         self.trackingBranch = status.trackingBranch
         self.trackingBranchAheadCommits = status.trackingBranchAhead
         self.trackingBranchBehindCommits = status.trackingBranchBehind
@@ -1618,10 +1630,20 @@ class Repo(QObject, QmlTypeMixin):
         details = CACHED_COMMIT_DETAILS.get(rev)
         if details:
             changes = [{"change": c.change, "path": c.path} for c in details.changes]
-            return dict(rev=details.rev, user=details.user,
+            return dict(rev=details.rev, date=details.date, user=details.user,
                         msg=details.msg, changes=changes)
         else:
             return dict(rev=rev, user="", msg="", changes=[])
+
+    @pyqtProperty("QStringList", notify=commitsChanged)
+    def commits(self):
+        return self._commits
+
+    @commits.setter
+    def commits(self, commits):
+        if self._commits != commits:
+            self._commits = commits
+            self.commitsChanged.emit(self._commits)
 
     @pyqtProperty(str, notify=pathChanged)
     def path(self):

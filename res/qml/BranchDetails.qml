@@ -94,6 +94,11 @@ Item {
                         font.pointSize:        Theme.fonts.smallPointSize
                     }
                     SelectableTextline {
+                        Layout.preferredWidth: 160
+                        text:                  details.date
+                        font.pointSize:        Theme.fonts.smallPointSize
+                    }
+                    SelectableTextline {
                         Layout.preferredWidth: 120
                         text:                  details.user
                         font.pointSize:        Theme.fonts.smallPointSize
@@ -115,7 +120,7 @@ Item {
 
                         Text {
                             id: theChange
-                            Layout.leftMargin:     190 + 2*theCommitRow.spacing
+                            Layout.leftMargin:     70 + 160 + 120 + 3*theCommitRow.spacing
                             Layout.preferredWidth: 12
                             text:                  modelData.change
                             font.family:           "courier"
