@@ -273,7 +273,7 @@ CommitChange = NamedTuple("CommitChange", (("change", str),
 
 class CachedCommitDetails(object):
     """Caching commit info for sake of performance"""
-    cache_size = 500
+    cache_size = 2000
 
     def __init__(self):
         self._cache = OrderedDict()
@@ -291,17 +291,22 @@ class CachedCommitDetails(object):
         return cd
 
     def get(self, rev, repo=None):
-        """Returns CommitDetail for selected revision from repository instance"""
-        with self._lock:
-            if rev in self._cache:
-                c = copy.copy(self._cache[rev])
-            elif repo:
-                c = self._create(rev, repo)
-            else:
-                c = None
-            while len(self._cache) > self.cache_size:
-                self._cache.popitem(last=False)
-        return c
+        """Returns CommitDetail for selected revision from git repository instance"""
+        try:
+            with self._lock:
+                if rev in self._cache:
+                    c = copy.copy(self._cache[rev])
+                elif repo:
+                    c = self._create(rev, repo)
+                else:
+                    c = None
+                while len(self._cache) > self.cache_size:
+                    self._cache.popitem(last=False)
+            return c
+        except:
+            LOGGER.exception("Failed to get commit detail for {} in {}"
+                             .format(rev, repo.working_dir if repo else "?"))
+            return None
 
 
 CACHED_COMMIT_DETAILS = CachedCommitDetails()
@@ -364,7 +369,7 @@ class GitStatus(object):
             self.commits = [c.hexsha for c in repo.iter_commits(max_count=50)]
             for c in self.commits:
                 CACHED_COMMIT_DETAILS.get(c, repo)
-        except TypeError:
+        except:
             LOGGER.exception("Failed to get commits for {}".format(self.path))
 
         try:
