@@ -771,6 +771,13 @@ class GitCheckoutWorker(QObject):
             self.checkoutprogress.emit(True)
             repo = git.Repo(self._path)
 
+            merge_conflict = repo.git.status(path, porcelain=True).strip().split()[0] == "UU"
+            if merge_conflict:
+                err_hint = "reset"
+                proc = repo.git.reset("--", path,
+                                      with_extended_output=True, as_process=True)
+                handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+
             err_hint = "checkout"
             proc = repo.git.checkout("--", path, force=True,
                                      with_extended_output=True, as_process=True)
@@ -1595,7 +1602,7 @@ class Repo(QObject, QmlTypeMixin):
         """
         all_cmds = OrderedDict()
         all_cmds["__revert"] = dict(title="Checkout / Revert",
-                                    statuses=("modified", "deleted"))
+                                    statuses=("modified", "deleted", "conflict"))
         all_cmds["__stage"] = dict(title="Stage / Add",
                                    statuses=("modified", "untracked", "deleted"))
         all_cmds["__discard"] = dict(title="Discard / Remove",
