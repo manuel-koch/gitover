@@ -459,8 +459,11 @@ class GitStatus(object):
         self.staged -= self.conflicts
 
         try:
-            merged_branches = [b.replace("*", "").strip()
-                               for b in repo.git.branch(self.trunkBranch, merged=True).split("\n")]
+            merged_branches = []
+            if self.trunkBranch:
+                merged_branches = [b.replace("*", "").strip()
+                                   for b in
+                                   repo.git.branch(self.trunkBranch, merged=True).split("\n")]
             merged_branches = [(b, self._trackingBranch(repo, b)) for b in merged_branches]
             self.mergedToTrunkBranches = [b[0] for b in merged_branches if
                                           b[1] != self.trunkBranch]
