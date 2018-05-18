@@ -283,6 +283,7 @@ Rectangle {
         height:          theNameLabel.height
         fgColor:         Theme.colors.badgeText
         bgColor:         Theme.colors.badgeError
+        autoHide:        10000
         MouseArea {
             anchors.fill: parent
             onClicked: {

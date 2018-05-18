@@ -24,22 +24,32 @@ import "."
 Item {
     id: root
 
-    property alias text:    theLabel.text
-    property alias fgColor: theLabel.color
-    property alias bgColor: theBackground.color
+    property alias text:     theLabel.text
+    property alias fgColor:  theLabel.color
+    property alias bgColor:  theBackground.color
+    property alias autoHide: theHideTimer.interval
 
-    implicitWidth: theLabel.implicitWidth + 1.5*theBackground.radius
+    implicitWidth: theLabel.implicitWidth
 
     Rectangle {
         id: theBackground
         anchors.fill: parent
-        radius:       Math.min( theLabel.implicitWidth, theLabel.implicitHeight ) * 0.4
+        radius:       Math.ceil(theLabel.font.pixelSize * 0.4)
     }
 
     Text {
         id: theLabel
         anchors.centerIn: parent
-        font.pixelSize:   Math.min( parent.width, parent.height ) * 0.8
+        leftPadding:      text ? theBackground.radius * 0.8 : 0
+        rightPadding:     text ? theBackground.radius * 0.8 : 0
+        font.pixelSize:   Math.ceil( parent.height * 0.8 )
         font.bold:        true
+    }
+
+    Timer {
+        id: theHideTimer
+        interval:    0
+        onTriggered: root.visible = false
+        running:     root.text && root.visible && interval
     }
 }
