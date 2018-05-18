@@ -1608,7 +1608,7 @@ class Repo(QObject, QmlTypeMixin):
         all_cmds["__discard"] = dict(title="Discard / Remove",
                                      statuses=("untracked",))
         all_cmds["__unstage"] = dict(title="Unstage / Reset",
-                                     statuses=("staged",))
+                                     statuses=("staged", "conflict"))
         cmds = []
         for cmd, config in all_cmds.items():
             if status in config["statuses"]:
