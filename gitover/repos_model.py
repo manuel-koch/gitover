@@ -588,9 +588,13 @@ class GitFetchWorker(QObject):
                 # prevent multiple fetch starting instantly
                 time.sleep(1 + 1.0 / random.randint(1, 10))
             repo = git.Repo(path)
-            proc = repo.git.fetch("origin", prune=True,
-                                  verbose=True, with_extended_output=True, as_process=True)
-            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+            remote_url = repo.git.config("remote.origin.url", local=True, with_exceptions=False)
+            if remote_url:
+                proc = repo.git.fetch("origin", prune=True,
+                                      verbose=True, with_extended_output=True, as_process=True)
+                handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+            else:
+                LOGGER.warning("Skipped fetching git repo at {}: missing remote url".format(path))
         except:
             LOGGER.exception("Failed to fetch git repo at {}".format(path))
             self.error.emit("Failed to fetch")
