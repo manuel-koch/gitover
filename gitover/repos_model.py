@@ -554,7 +554,7 @@ class GitFetchWorker(QObject):
     # signal gets emitted for every generated output line during fetch
     output = pyqtSignal(str)
 
-    # signal gets emitted when an error happened during pull
+    # signal gets emitted when an error happened during fetch
     error = pyqtSignal(str)
 
     def __init__(self, workerSlot):
@@ -590,7 +590,7 @@ class GitFetchWorker(QObject):
             repo = git.Repo(path)
             remote_url = repo.git.config("remote.origin.url", local=True, with_exceptions=False)
             if remote_url:
-                proc = repo.git.fetch("origin", prune=True,
+                proc = repo.git.fetch("origin", prune=True, no_recurse_submodules=True,
                                       verbose=True, with_extended_output=True, as_process=True)
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
             else:
