@@ -19,7 +19,7 @@ BUNDLE_MACOS_DIR=${BUNDLE_CONTENTS_DIR}/MacOS
 #
 # Extended debug while building/running application:
 # --log-level=DEBUG --debug
-pyinstaller --icon ${THIS_DIR}/res/icon.icns --onefile --windowed --noconfirm --clean -n GitOver --paths ${THIS_DIR} ${THIS_DIR}/gitover/main.py
+pyinstaller --icon ${THIS_DIR}/res/icon.icns --onefile --windowed --noconfirm --clean --hidden-import PyQt5.sip -n GitOver --paths ${THIS_DIR} ${THIS_DIR}/gitover/main.py
 
 # Add support for high DPI aka retina displays
 INFO_PLIST=${BUNDLE_CONTENTS_DIR}/Info.plist
