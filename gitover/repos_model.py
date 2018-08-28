@@ -21,6 +21,7 @@ Copyright 2017 Manuel Koch
 
 Data model for all repositiories.
 """
+import webbrowser
 from collections import OrderedDict
 import copy
 import datetime
@@ -1007,6 +1008,11 @@ class GitPushWorker(QObject):
     # signal gets emitted when an error happened during push
     error = pyqtSignal(str)
 
+    # signal gets emitted when a remote URL is detected in push output
+    remote_url = pyqtSignal(str)
+
+    remote_url_re = re.compile(r"remote:\s+(?P<url>http(s?)://\S+)")
+
     def __init__(self, workerSlot, path):
         super().__init__()
         self._workerSlot = workerSlot
@@ -1050,6 +1056,10 @@ class GitPushWorker(QObject):
         line = line.rstrip()
         LOGGER.debug(line)
         self.output.emit(line)
+
+        m = self.remote_url_re.match(line)
+        if m:
+            self.remote_url.emit(m.group("url"))
 
 
 ChangedPath = NamedTuple("ChangedPath", [("path", str), ("status", str)])
@@ -1191,6 +1201,7 @@ class Repo(QObject, QmlTypeMixin):
     remoteBranchesChanged = pyqtSignal("QStringList")
     mergedToTrunkBranchesChanged = pyqtSignal("QStringList")
     commitsChanged = pyqtSignal("QStringList")
+    remoteUrlChanged = pyqtSignal(str, arguments=["url"])
 
     trackingBranchChanged = pyqtSignal(str)
     trackingBranchAheadChanged = pyqtSignal(int)
@@ -1260,6 +1271,7 @@ class Repo(QObject, QmlTypeMixin):
         self._pushWorker.pushprogress.connect(self._setPushing)
         self._pushWorker.output.connect(self._output.appendOutput)
         self._pushWorker.error.connect(self.error)
+        self._pushWorker.remote_url.connect(self._onPushRemoteUrl)
 
         self._branch = ""
         self._detached = False
@@ -1267,6 +1279,7 @@ class Repo(QObject, QmlTypeMixin):
         self._remote_branches = []
         self._merged_to_trunk_branches = []
         self._commits = []
+        self._remote_url = ""
 
         self._tracking_branch = ""
         self._tracking_branch_ahead_commits = []
@@ -1440,6 +1453,14 @@ class Repo(QObject, QmlTypeMixin):
             return
         self._pushWorker.pushBranch(branch, force)
         self._pushTriggered = True
+
+    @pyqtSlot(str)
+    def _onPushRemoteUrl(self, url):
+        self.remoteUrl = url
+
+    @pyqtSlot()
+    def openRemoteUrl(self):
+        webbrowser.open(self._remote_url)
 
     @pyqtSlot(object)
     def _onStatusUpdated(self, status):
@@ -1693,6 +1714,7 @@ class Repo(QObject, QmlTypeMixin):
         if self._branch != branch:
             self._branch = branch
             self.branchChanged.emit(self._branch)
+            self.remoteUrl = ""
 
     @pyqtProperty(bool, notify=detachedChanged)
     def detached(self):
@@ -1871,3 +1893,13 @@ class Repo(QObject, QmlTypeMixin):
         if self._staged != staged:
             self._staged = staged
             self.stagedChanged.emit(self._staged)
+
+    @pyqtProperty(str, notify=remoteUrlChanged)
+    def remoteUrl(self):
+        return self._remote_url
+
+    @remoteUrl.setter
+    def remoteUrl(self, url):
+        if self._remote_url != url:
+            self._remote_url = url
+            self.remoteUrlChanged.emit(self._remote_url)

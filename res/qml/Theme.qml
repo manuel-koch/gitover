@@ -53,6 +53,7 @@ Item {
         property color badgeCheckout: "#A41C53"
         property color badgeRebase:   "#BD3A6F"
         property color badgePush:     "#432182"
+        property color badgeRemote:   "#8095C7"
     }
 
     QtObject {

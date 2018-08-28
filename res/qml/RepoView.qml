@@ -45,6 +45,10 @@ Rectangle {
             theErrorBadge.text = msg
             theErrorBadge.visible = true
         }
+        onRemoteUrlChanged: {
+            theRemoteUrlBadge.text = "Goto remote..."
+            theRemoteUrlBadge.visible = url != ""
+        }
     }
 
     MouseArea {
@@ -271,6 +275,24 @@ Rectangle {
                 elide:          Text.ElideRight
                 text:           internal.changeSummary
                 wrapMode:       Text.Wrap
+            }
+        }
+    }
+
+    RepoActionBadge {
+        id: theRemoteUrlBadge
+        anchors.margins: 4
+        anchors.right:   parent.right
+        anchors.bottom:  parent.bottom
+        height:          theNameLabel.height
+        fgColor:         Theme.colors.badgeText
+        bgColor:         Theme.colors.badgeRemote
+        autoHide:        5000
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                repository.openRemoteUrl()
+                theRemoteUrlBadge.visible = false
             }
         }
     }
