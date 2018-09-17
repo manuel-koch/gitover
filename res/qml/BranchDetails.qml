@@ -89,23 +89,23 @@ Item {
                         id: theRev
                         Layout.leftMargin:     10
                         Layout.preferredWidth: 60
-                        text:                  details.rev
+                        text:                  details.rev ? details.rev : ""
                         font.family:           "courier"
                         font.pointSize:        Theme.fonts.smallPointSize
                     }
                     SelectableTextline {
                         Layout.preferredWidth: 160
-                        text:                  details.date
+                        text:                  details.date ? details.date : ""
                         font.pointSize:        Theme.fonts.smallPointSize
                     }
                     SelectableTextline {
                         Layout.preferredWidth: 120
-                        text:                  details.user
+                        text:                  details.user ? details.user : ""
                         font.pointSize:        Theme.fonts.smallPointSize
                     }
                     SelectableTextline {
                         Layout.fillWidth: true
-                        text:             details.msg
+                        text:             details.msg ? details.msg : ""
                         font.family:      "courier"
                         font.pointSize:   Theme.fonts.smallPointSize
                     }
