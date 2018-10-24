@@ -75,12 +75,13 @@ Rectangle {
                 SelectableTextline {
                     property bool current:  root.repository !== null && repository.branch == modelData
                     property bool obsolete: root.repository !== null && repository.mergedToTrunkBranches.indexOf(modelData) != -1
-                    width:          parent.width
-                    text:           modelData
-                    label:          (obsolete ? "--> <i>(obsolete: already merged to trunk)</i>" : "")
-                    font.pointSize: Theme.fonts.smallPointSize
-                    font.bold:      current
-                    leftPadding:    10
+                    width:           parent.width
+                    text:            modelData
+                    label:           (obsolete ? "--> <i>(obsolete: already merged to trunk)</i> --> <a href='delete'>delete</a>" : "")
+                    font.pointSize:  Theme.fonts.smallPointSize
+                    font.bold:       current
+                    leftPadding:     10
+                    onLinkActivated: repository.triggerDeleteBranch(text)
                 }
             }
             Text {

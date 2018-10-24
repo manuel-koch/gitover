@@ -759,6 +759,27 @@ class GitCheckoutWorker(QObject):
         finally:
             self.checkoutprogress.emit(False)
 
+    def deleteBranch(self, branch):
+        """Delete existing branch"""
+        self._workerSlot.schedule(self._onDeleteBranch, branch)
+
+    def _onDeleteBranch(self, branch):
+        """Delete existing branch"""
+        try:
+            self.checkoutprogress.emit(True)
+            repo = git.Repo(self._path)
+
+            err_hint = "delete branch"
+            proc = repo.git.branch("-D", branch,
+                                   with_extended_output=True, as_process=True)
+            handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
+        except:
+            LOGGER.exception(
+                "Failed to delete branch {} in git repo at {}".format(branch, self._path))
+            self.error.emit("Failed to " + err_hint)
+        finally:
+            self.checkoutprogress.emit(False)
+
     def checkoutPath(self, path):
         """Checkout selected path reverting any local changes"""
         self._workerSlot.schedule(self._onCheckoutPath, path)
