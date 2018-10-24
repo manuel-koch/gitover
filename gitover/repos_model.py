@@ -418,7 +418,7 @@ class GitStatus(object):
         try:
             trunkBranches = [repo.git.config("gitover.trunkbranch", with_exceptions=False),
                              "origin/develop", "origin/master"]
-            while trunkBranches and trunkBranches[0] not in allRemoteBranches:
+            while trunkBranches and trunkBranches[0] not in set(allRemoteBranches + branches):
                 trunkBranches.pop(0)
             self.trunkBranch = trunkBranches[0] if trunkBranches else ""
         except:
@@ -466,8 +466,8 @@ class GitStatus(object):
                                    for b in
                                    repo.git.branch(self.trunkBranch, merged=True).split("\n")]
             merged_branches = [(b, self._trackingBranch(repo, b)) for b in merged_branches]
-            self.mergedToTrunkBranches = [b[0] for b in merged_branches if
-                                          b[1] != self.trunkBranch]
+            self.mergedToTrunkBranches = [b[0] for b in merged_branches
+                                          if self.trunkBranch not in b]
         except:
             LOGGER.exception("Failed to detect branches that are already merged to trunk")
 
@@ -1408,11 +1408,11 @@ class Repo(QObject, QmlTypeMixin):
 
     @pyqtSlot(str)
     def triggerCreateBranch(self, branch):
-        if self._checkoutTriggered:
-            LOGGER.debug("Checkout already triggered...")
-            return
         self._checkoutWorker.createBranch(branch)
-        self._checkoutTriggered = True
+
+    @pyqtSlot(str)
+    def triggerDeleteBranch(self, branch):
+        self._checkoutWorker.deleteBranch(branch)
 
     @pyqtProperty(bool, notify=rebasingChanged)
     def rebasing(self):
