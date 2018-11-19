@@ -32,7 +32,7 @@ from PyQt5.QtQml import QQmlApplicationEngine
 from PyQt5.QtQuick import QQuickView
 
 from gitover.ui.resources import gitover_commit_sha, gitover_version
-from gitover.repos_model import ReposModel, Repo, ChangedFilesModel, OutputModel
+from gitover.repos_model import ReposModel, Repo, ChangedFilesModel, OutputModel, CommitDetails
 from gitover.formatter import GitDiffFormatter
 from gitover.res_helper import getResourceUrl
 from gitover.wakeup import WakeupWatcher
@@ -92,6 +92,7 @@ def run_gui(repo_paths, watch_filesystem):
     ChangedFilesModel.registerToQml()
     OutputModel.registerToQml()
     GitDiffFormatter.registerToQml()
+    CommitDetails.registerToQml()
 
     settings = QSettings()
     settings.beginGroup("MainWindow")
@@ -102,7 +103,7 @@ def run_gui(repo_paths, watch_filesystem):
     settings.endGroup()
 
     repos = ReposModel(watch_filesystem=watch_filesystem)
-    [repos.addRepo(Repo(path)) for path in repo_paths]
+    [repos.addRepoByPath(path, defer=True) for path in repo_paths]
 
     engine = QQmlApplicationEngine(app)
     engine.setOutputWarningsToStandardError(True)

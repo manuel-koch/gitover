@@ -197,6 +197,14 @@ Rectangle {
                 bgColor:                Theme.colors.badgePush
                 visible:                root.repository && root.repository.pushing
             }
+            RepoActionBadge {
+                id: theBusyBadge
+                Layout.preferredHeight: theNameLabel.height
+                text:                   "..."
+                fgColor:                Theme.colors.badgeText
+                bgColor:                Theme.colors.badgeBusy
+                visible:                root.repository && root.repository.busy
+            }
         }
         LabelValueRow {
             id: theBranchRow

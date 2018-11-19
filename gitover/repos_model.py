@@ -45,6 +45,7 @@ from PyQt5.QtCore import QVariant
 from PyQt5.QtCore import Qt, pyqtProperty, pyqtSignal, QObject
 from PyQt5.QtCore import QAbstractItemModel
 from PyQt5.QtCore import QThread
+from PyQt5.QtQml import qmlRegisterType
 
 from gitover.fswatcher import RepoFsWatcher
 from gitover.qml_helpers import QmlTypeMixin
@@ -80,8 +81,14 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
 
         self._queued_path = []
         self._queueTimer = QTimer()
-        self._queueTimer.setInterval(50)
+        self._queueTimer.setInterval(100)
+        self._queueTimer.setSingleShot(True)
         self._queueTimer.timeout.connect(self._nextAddRepo)
+
+        self._updateTimer = QTimer()
+        self._updateTimer.setInterval(1000)
+        self._updateTimer.setSingleShot(True)
+        self._updateTimer.timeout.connect(self._updateRepos)
 
         cfg = Config()
         cfg.load(os.path.expanduser("~"))
@@ -199,6 +206,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         try:
             if not os.path.isdir(path):
                 return False
+            LOGGER.debug("Checking if path is a git repo {}".format(path))
             return bool(git.Repo(path).head)
         except:
             LOGGER.exception("Path is not a git repo: {}".format(path))
@@ -208,12 +216,16 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         self.addRepoByPath(url.toLocalFile(), saveAsRecent=True)
 
     @pyqtSlot(str)
-    def addRepoByPath(self, path, saveAsRecent=False):
+    def addRepoByPath(self, path, saveAsRecent=False, defer=False):
         if self._isRepo(path):
             repo = Repo(path)
-            self.addRepo(repo, saveAsRecent)
+            if defer:
+                self._queued_path += [(path, None)]
+                self._queueTimer.start()
+            else:
+                self.addRepo(repo, saveAsRecent)
 
-    def addRepo(self, repo, saveAsRecent=False):
+    def addRepo(self, repo, saveAsRecent=False, defer=False):
         if any([r.path == repo.path for r in self._repos]):
             return False
 
@@ -230,6 +242,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         self.nofReposChanged.emit(self.nofRepos)
 
         rootpath = repo.path
+        LOGGER.info("Searching sub repos of {}".format(rootpath))
         subpaths = list(filter(self._isRepo, [r.abspath for r in git.Repo(rootpath).submodules]))
         for subpath in subpaths:
             name = subpath[len(rootpath) + 1:]
@@ -239,6 +252,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
             self._fsWatcher.track.emit(rootpath)
 
         self._queueTimer.start()
+        self._updateTimer.start()
 
         if saveAsRecent:
             self._addRecentRepos(repo)
@@ -249,9 +263,20 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         if not self._queued_path:
             return
         path, name = self._queued_path.pop(0)
-        repo = Repo(path, name)
-        self.addRepo(repo)
+        try:
+            repo = Repo(path, name)
+            self.addRepo(repo)
+        except:
+            LOGGER.exception("Failed to add repo at {}".format(path))
         self._queueTimer.start()
+
+    def _updateRepos(self):
+        LOGGER.debug("Triggering initial update of new repos...")
+        for repo in self._repos:
+            if not repo.branch and not repo.detached:
+                LOGGER.debug("Triggering initial update of {}...".format(repo.path))
+                repo.triggerUpdate()
+                repo.triggerFetch()
 
     def _onRepoChanged(self, path):
         roots = [(repo.path, repo) for repo in self._repos]
@@ -260,57 +285,6 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
             if path == root or path.startswith(root + os.sep):
                 repo.triggerUpdate()
                 return
-
-
-CommitDetail = NamedTuple("CommitDetail", (("rev", str),
-                                           ("date", str),
-                                           ("user", str),
-                                           ("msg", str),
-                                           ("changes", list)))
-
-CommitChange = NamedTuple("CommitChange", (("change", str),
-                                           ("path", str)))
-
-
-class CachedCommitDetails(object):
-    """Caching commit info for sake of performance"""
-    cache_size = 2000
-
-    def __init__(self):
-        self._cache = OrderedDict()
-        self._lock = threading.Lock()
-
-    def _create(self, rev, repo):
-        """Create and return CommitDetail for selected revision from repository instance"""
-        c = repo.commit(rev)
-        msg = c.message.split("\n")[0].strip()
-        shortrev = repo.git.rev_parse(c.hexsha, short=8)
-        changes = repo.git.diff_tree(rev, no_commit_id=True, name_status=True, r=True).split("\n")
-        changes = [CommitChange(*c.split("\t")) for c in changes if c.strip()]
-        cd = CommitDetail(shortrev, str(c.committed_datetime), c.author.name, msg, changes)
-        self._cache[rev] = cd
-        return cd
-
-    def get(self, rev, repo=None):
-        """Returns CommitDetail for selected revision from git repository instance"""
-        try:
-            with self._lock:
-                if rev in self._cache:
-                    c = copy.copy(self._cache[rev])
-                elif repo:
-                    c = self._create(rev, repo)
-                else:
-                    c = None
-                while len(self._cache) > self.cache_size:
-                    self._cache.popitem(last=False)
-            return c
-        except:
-            LOGGER.exception("Failed to get commit detail for {} in {}"
-                             .format(rev, repo.working_dir if repo else "?"))
-            return None
-
-
-CACHED_COMMIT_DETAILS = CachedCommitDetails()
 
 
 class GitStatus(object):
@@ -347,7 +321,6 @@ class GitStatus(object):
                     ahead += [commit]
                 else:
                     behind += [commit]
-                CACHED_COMMIT_DETAILS.get(commit, repo)
         return (ahead, behind)
 
     def _trackingBranch(self, repo, branch):
@@ -360,7 +333,7 @@ class GitStatus(object):
     def update(self):
         """Update info from current git repository"""
         try:
-            LOGGER.info("Updating status repository at {}".format(self.path))
+            LOGGER.info("Updating status for repository at {}".format(self.path))
             repo = git.Repo(self.path)
         except:
             LOGGER.exception("Invalid repository at {}".format(self.path))
@@ -368,8 +341,6 @@ class GitStatus(object):
 
         try:
             self.commits = [c.hexsha for c in repo.iter_commits(max_count=50)]
-            for c in self.commits:
-                CACHED_COMMIT_DETAILS.get(c, repo)
         except:
             LOGGER.exception("Failed to get commits for {}".format(self.path))
 
@@ -471,19 +442,33 @@ class GitStatus(object):
         except:
             LOGGER.exception("Failed to detect branches that are already merged to trunk")
 
+        LOGGER.info("Got status for repository at {}".format(self.path))
 
-class WorkerSlot:
 
-    def __init__(self):
-        self._lock = threading.Lock()
+class WorkerSlot(QObject):
+    busyChanged = pyqtSignal(bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._lock = threading.RLock()
         self._runnables = []
 
     def schedule(self, func, *args, **kwargs):
         with self._lock:
             runnable = WorkerRunnable(self, func, *args, **kwargs)
+            runnable.setAutoDelete(False)
             self._runnables.append(runnable)
             if len(self._runnables) == 1:
+                self.busyChanged.emit(True)
                 self._next()
+        return runnable
+
+    def cancel(self, runnable):
+        with self._lock:
+            if runnable in self._runnables:
+                runnable.abort = True
+                self._runnables.remove(runnable)
+                QThreadPool.globalInstance().tryTake(runnable)
 
     def _next(self):
         if self._runnables:
@@ -491,11 +476,21 @@ class WorkerSlot:
 
     def done(self, runnable):
         with self._lock:
-            self._runnables.remove(runnable)
+            if runnable in self._runnables:
+                self._runnables.remove(runnable)
             self._next()
+            if not self._runnables:
+                self.busyChanged.emit(False)
+
+    @pyqtProperty(bool, notify=busyChanged)
+    def busy(self):
+        with self._lock:
+            return len(self._runnables) > 0
 
 
 class WorkerRunnable(QRunnable):
+    abort = False
+
     def __init__(self, slot, func, *args, **kwargs):
         super().__init__()
         assert isinstance(slot, WorkerSlot)
@@ -506,7 +501,8 @@ class WorkerRunnable(QRunnable):
 
     def run(self):
         try:
-            self._func(*self._args, **self._kwargs)
+            if not self.abort:
+                self._func(*self._args, **self._kwargs)
         except:
             LOGGER.exception("Worker runnable failed")
         finally:
@@ -1210,6 +1206,17 @@ class OutputModel(QAbstractItemModel, QmlTypeMixin):
         self.countChanged.emit(self.rowCount())
 
 
+CommitDetail = NamedTuple("CommitDetail", (("rev", str),
+                                           ("shortrev", str),
+                                           ("date", str),
+                                           ("user", str),
+                                           ("msg", str),
+                                           ("changes", list)))
+
+CommitChange = NamedTuple("CommitChange", (("change", str),
+                                           ("path", str)))
+
+
 class Repo(QObject, QmlTypeMixin):
     """Contains repository information"""
 
@@ -1251,7 +1258,11 @@ class Repo(QObject, QmlTypeMixin):
 
     statusUpdated = pyqtSignal()
 
+    commitDetails = pyqtSignal(object)
+
     error = pyqtSignal(str, arguments=["msg"])
+
+    busyChanged = pyqtSignal(bool)
 
     def __init__(self, path, name="", parent=None):
         super().__init__(parent)
@@ -1261,38 +1272,43 @@ class Repo(QObject, QmlTypeMixin):
         self._changes = ChangedFilesModel(self)
         self._output = OutputModel(self)
 
-        self._workerSlot = WorkerSlot()
+        self.workerSlot = WorkerSlot(self)
+        self.workerSlot.busyChanged.connect(self.busyChanged)
 
-        self._statusWorker = GitStatusWorker(self._workerSlot)
+        self._statusWorker = GitStatusWorker(self.workerSlot)
         self._statusWorker.statusprogress.connect(self._onUpdating)
         self._statusWorker.statusupdated.connect(self._onStatusUpdated)
 
-        self._fetchWorker = GitFetchWorker(self._workerSlot)
+        self._fetchWorker = GitFetchWorker(self.workerSlot)
         self._fetchWorker.fetchprogress.connect(self._setFetching)
         self._fetchWorker.output.connect(self._output.appendOutput)
         self._fetchWorker.error.connect(self.error)
 
-        self._pullWorker = GitPullWorker(self._workerSlot)
+        self._pullWorker = GitPullWorker(self.workerSlot)
         self._pullWorker.pullprogress.connect(self._setPulling)
         self._pullWorker.output.connect(self._output.appendOutput)
         self._pullWorker.error.connect(self.error)
 
-        self._checkoutWorker = GitCheckoutWorker(self._workerSlot, self._path)
+        self._checkoutWorker = GitCheckoutWorker(self.workerSlot, self._path)
         self._checkoutWorker.checkoutprogress.connect(self._setCheckingOut)
         self._checkoutWorker.output.connect(self._output.appendOutput)
         self._checkoutWorker.error.connect(self.error)
 
-        self._rebaseWorker = GitRebaseWorker(self._workerSlot, self._path)
+        self._rebaseWorker = GitRebaseWorker(self.workerSlot, self._path)
         self._rebaseWorker.rebaseprogress.connect(self._setRebasing)
         self._rebaseWorker.output.connect(self._output.appendOutput)
         self._rebaseWorker.error.connect(self.triggerUpdate)
         self._rebaseWorker.error.connect(self.error)
 
-        self._pushWorker = GitPushWorker(self._workerSlot, self._path)
+        self._pushWorker = GitPushWorker(self.workerSlot, self._path)
         self._pushWorker.pushprogress.connect(self._setPushing)
         self._pushWorker.output.connect(self._output.appendOutput)
         self._pushWorker.error.connect(self.error)
         self._pushWorker.remote_url.connect(self._onPushRemoteUrl)
+
+        self._commit_cache = OrderedDict()
+        self._commit_cache_max_size = 100
+        self._commit_cache_lock = threading.Lock()
 
         self._branch = ""
         self._detached = False
@@ -1334,11 +1350,12 @@ class Repo(QObject, QmlTypeMixin):
         self._pushing = False
         self._pushTriggered = False
 
-        self.triggerUpdate()
-        self.triggerFetch()
-
     def __str__(self):
         return self._path
+
+    @pyqtProperty(bool, notify=busyChanged)
+    def busy(self):
+        return self.workerSlot.busy
 
     @pyqtProperty(QObject, constant=True)
     def changes(self):
@@ -1688,13 +1705,32 @@ class Repo(QObject, QmlTypeMixin):
     @pyqtSlot(str, result=QVariant)
     def commit(self, rev):
         """Returns details for commit of given shahex revision"""
-        details = CACHED_COMMIT_DETAILS.get(rev)
-        if details:
-            changes = [{"change": c.change, "path": c.path} for c in details.changes]
-            return dict(rev=details.rev, date=details.date, user=details.user,
-                        msg=details.msg, changes=changes)
-        else:
-            return dict(rev=rev, user="", msg="", changes=[])
+        if not self._commit_cache_lock.acquire(timeout=0.1):
+            LOGGER.error("Failed to get commit detail for {} in {}".format(rev, self._path))
+            return None
+        try:
+            if rev in self._commit_cache:
+                cd = copy.copy(self._commit_cache[rev])
+            else:
+                LOGGER.debug("Commit details for {} in {}".format(rev, self._path))
+                repo = git.Repo(self._path)
+                c = repo.commit(rev)
+                msg = c.message.split("\n")[0].strip()
+                shortrev = repo.git.rev_parse(c.hexsha, short=8)
+                changes = repo.git.diff_tree(rev, no_commit_id=True, name_status=True,
+                                             r=True).split("\n")
+                changes = [CommitChange(*c.split("\t")) for c in changes if c.strip()]
+                cd = CommitDetail(rev, shortrev, str(c.committed_datetime), c.author.name, msg,
+                                  changes)
+                self._commit_cache[rev] = cd
+            while len(self._commit_cache) > self._commit_cache_max_size:
+                self._commit_cache.popitem(last=False)
+            return cd
+        except:
+            LOGGER.exception("Failed to get commit detail for {} in {}".format(rev, self._path))
+            return None
+        finally:
+            self._commit_cache_lock.release()
 
     @pyqtProperty("QStringList", notify=commitsChanged)
     def commits(self):
@@ -1924,3 +1960,131 @@ class Repo(QObject, QmlTypeMixin):
         if self._remote_url != url:
             self._remote_url = url
             self.remoteUrlChanged.emit(self._remote_url)
+
+
+class CommitDetails(QObject):
+    """Contains detail info of a commit"""
+
+    Change = NamedTuple("Change", (("change", str),
+                                   ("path", str)))
+
+    repositoryChanged = pyqtSignal(Repo)
+    revChanged = pyqtSignal('QString')
+    shortrevChanged = pyqtSignal('QString')
+    dateChanged = pyqtSignal('QString')
+    userChanged = pyqtSignal('QString')
+    msgChanged = pyqtSignal('QString')
+    changesChanged = pyqtSignal(QVariant)
+
+    @classmethod
+    def registerToQml(cls):
+        qmlRegisterType(cls, 'Gitover', 1, 0, 'CommitDetails')
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._repository = None
+        self._rev = ""
+        self._shortrev = ""
+        self._date = ""
+        self._user = ""
+        self._msg = ""
+        self._changes = []
+        self._runnable = None
+        self.destroyed.connect(lambda: self._cancelRunnable())
+
+    def _cancelRunnable(self):
+        if self._runnable:
+            self._repository.workerSlot.cancel(self._runnable)
+        self._runnable = None
+
+    def _update(self):
+        if not self._repository or not self._rev:
+            self.shortrev = ""
+            self.date = ""
+            self.user = ""
+            self.msg = ""
+            self.changes = []
+        else:
+            self._runnable = self._repository.workerSlot.schedule(self._updateImpl)
+
+    def _updateImpl(self):
+        cd = self._repository.commit(self._rev)
+        if cd and self._runnable:
+            self.shortrev = cd.shortrev
+            self.date = cd.date
+            self.user = cd.user
+            self.msg = cd.msg
+            self.changes = [{"change": ch.change, "path": ch.path} for ch in cd.changes]
+        self._runnable = None
+
+    @pyqtProperty(Repo, notify=repositoryChanged)
+    def repository(self):
+        return self._repository
+
+    @repository.setter
+    def repository(self, repository):
+        if repository != self._repository:
+            self._repository = repository
+            self.repositoryChanged.emit(self._repository)
+            self._update()
+
+    @pyqtProperty('QString', notify=revChanged)
+    def rev(self):
+        return self._rev
+
+    @rev.setter
+    def rev(self, rev):
+        if rev != self._rev:
+            self._rev = rev
+            self.revChanged.emit(self._rev)
+            self._update()
+
+    @pyqtProperty('QString', notify=shortrevChanged)
+    def shortrev(self):
+        return self._shortrev
+
+    @shortrev.setter
+    def shortrev(self, shortrev):
+        if shortrev != self._shortrev:
+            self._shortrev = shortrev
+            self.shortrevChanged.emit(self._shortrev)
+
+    @pyqtProperty('QString', notify=dateChanged)
+    def date(self):
+        return self._date
+
+    @date.setter
+    def date(self, date):
+        if date != self._date:
+            self._date = date
+            self.dateChanged.emit(self._date)
+
+    @pyqtProperty('QString', notify=userChanged)
+    def user(self):
+        return self._user
+
+    @user.setter
+    def user(self, user):
+        if user != self._user:
+            self._user = user
+            self.userChanged.emit(self._user)
+
+    @pyqtProperty('QString', notify=msgChanged)
+    def msg(self):
+        return self._msg
+
+    @msg.setter
+    def msg(self, msg):
+        if msg != self._msg:
+            self._msg = msg
+            self.msgChanged.emit(self._msg)
+
+    @pyqtProperty('QVariant', notify=changesChanged)
+    def changes(self):
+        return self._changes
+
+    @changes.setter
+    def changes(self, changes):
+        if changes != self._changes:
+            self._changes = changes
+            self.changesChanged.emit(self._changes)

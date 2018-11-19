@@ -78,7 +78,10 @@ Item {
             Column {
                 width: parent.width
 
-                property var details: root.repository.commit(modelData)
+                property CommitDetails details: CommitDetails {
+                    repository: root.repository
+                    rev:        modelData
+                }
 
                 RowLayout {
                     id: theCommitRow
@@ -89,7 +92,7 @@ Item {
                         id: theRev
                         Layout.leftMargin:     10
                         Layout.preferredWidth: 60
-                        text:                  details.rev ? details.rev : ""
+                        text:                  details.shortrev ? details.shortrev : ""
                         font.family:           "courier"
                         font.pointSize:        Theme.fonts.smallPointSize
                     }
