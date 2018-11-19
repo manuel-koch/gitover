@@ -52,7 +52,7 @@ def setupLogging(verbose, detailed=False, path=None):
     "Setup logging functionality"
     rootlogger = logging.getLogger()
     hdl = logging.StreamHandler(sys.stdout)
-    fmtmsg = "%(asctime)s %(levelname)s %(name)s(%(lineno)d): %(message)s"
+    fmtmsg = "%(asctime)s %(thread)s %(levelname)5s %(name)s(%(lineno)d): %(message)s"
     if verbose:
         hdl.setLevel(logging.DEBUG)
     else:
@@ -76,15 +76,15 @@ def main():
     grpMisc.add_argument('--version', action='version', version='%(prog)s')
     grpMisc.add_argument('--verbose', dest='verbose', action="store_true",
                          help='Be more verbose on console logging.')
-    grpMisc.add_argument('--timing', dest='timing', action="store_true",
-                         help='Include timestamps on console logging.')
+    grpMisc.add_argument('--detailed-log', dest='detailedLog', action="store_true",
+                         help='Include timestamps and modules on console logging.')
     grpMisc.add_argument('--log', dest='logPath', metavar="PATH",
                          help='Store verbose messages during processing in given file too.')
     grpMisc.add_argument('--no-fs-watch', dest='watchFs', action="store_false", default=True,
                          help="Don't watch filesystem changes in repositories.")
     args = parser.parse_args()
 
-    setupLogging(args.verbose, args.timing, args.logPath)
+    setupLogging(args.verbose, args.detailedLog, args.logPath)
 
     if sys.platform == "win32":
         # The default SIGBREAK action remains to call Win32 ExitProcess().
