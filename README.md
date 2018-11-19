@@ -26,6 +26,7 @@ git interactions :
 * [PyQt5][2], to implement a cross platform UI
 * [GitPython][3], to display repository info and trigger git actions
 * [PyInstaller][4], to bundle an easy to distribute application bundle
+* [fswatch][5], to track changes in filesystem
 
 ## Customize GitOver
 
@@ -108,7 +109,7 @@ the trunk branch.
 Double clicking the GitOver app doesn't start it - instead it crashes silently.
 It may still run when starting it explicitly on console.
 Cause may be misconfigured or not yet installed XCode stuff after Mac OSX upgrade ( i.e. to High Sierra ).
-You may need to reinstall XCode stuff to get git working again, [see][5].
+You may need to reinstall XCode stuff to get git working again, [see][6].
 
 
 
@@ -116,4 +117,5 @@ You may need to reinstall XCode stuff to get git working again, [see][5].
 [2]: http://pyqt.sourceforge.net/Docs/PyQt5/ "PyQt5"
 [3]: http://gitpython.readthedocs.io/en/stable/ "GitPython"
 [4]: http://www.pyinstaller.org/ "PyInstaller"
-[5]: http://www.linuxuk.org/post/fixing_git_on_macOS_Sierra/
+[5]: https://github.com/emcrisostomo/fswatch "fswatch"
+[6]: http://www.linuxuk.org/post/fixing_git_on_macOS_Sierra/
