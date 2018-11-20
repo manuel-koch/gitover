@@ -109,6 +109,7 @@ Item {
                     SelectableTextline {
                         Layout.fillWidth: true
                         text:             details.msg ? details.msg : ""
+                        label:            details.tags.map( function(t) { return "<b>"+t+"</b>";} ).join("  ")
                         font.family:      "courier"
                         font.pointSize:   Theme.fonts.smallPointSize
                     }

@@ -1211,6 +1211,7 @@ CommitDetail = NamedTuple("CommitDetail", (("rev", str),
                                            ("date", str),
                                            ("user", str),
                                            ("msg", str),
+                                           ("tags", list),
                                            ("changes", list)))
 
 CommitChange = NamedTuple("CommitChange", (("change", str),
@@ -1715,13 +1716,14 @@ class Repo(QObject, QmlTypeMixin):
                 LOGGER.debug("Commit details for {} in {}".format(rev, self._path))
                 repo = git.Repo(self._path)
                 c = repo.commit(rev)
+                tags = [t.name for t in repo.tags if c.hexsha == t.commit.hexsha]
                 msg = c.message.split("\n")[0].strip()
                 shortrev = repo.git.rev_parse(c.hexsha, short=8)
                 changes = repo.git.diff_tree(rev, no_commit_id=True, name_status=True,
                                              r=True).split("\n")
                 changes = [CommitChange(*c.split("\t")) for c in changes if c.strip()]
                 cd = CommitDetail(rev, shortrev, str(c.committed_datetime), c.author.name, msg,
-                                  changes)
+                                  tags, changes)
                 self._commit_cache[rev] = cd
             while len(self._commit_cache) > self._commit_cache_max_size:
                 self._commit_cache.popitem(last=False)
@@ -1974,6 +1976,7 @@ class CommitDetails(QObject):
     dateChanged = pyqtSignal('QString')
     userChanged = pyqtSignal('QString')
     msgChanged = pyqtSignal('QString')
+    tagsChanged = pyqtSignal('QStringList')
     changesChanged = pyqtSignal(QVariant)
 
     @classmethod
@@ -1988,6 +1991,7 @@ class CommitDetails(QObject):
         self._date = ""
         self._user = ""
         self._msg = ""
+        self._tags = []
         self._changes = []
         self._runnable = None
         self.destroyed.connect(lambda: self._cancelRunnable())
@@ -2014,6 +2018,7 @@ class CommitDetails(QObject):
             self.date = cd.date
             self.user = cd.user
             self.msg = cd.msg
+            self.tags = cd.tags
             self.changes = [{"change": ch.change, "path": ch.path} for ch in cd.changes]
         self._runnable = None
 
@@ -2078,6 +2083,16 @@ class CommitDetails(QObject):
         if msg != self._msg:
             self._msg = msg
             self.msgChanged.emit(self._msg)
+
+    @pyqtProperty('QStringList', notify=tagsChanged)
+    def tags(self):
+        return self._tags
+
+    @tags.setter
+    def tags(self, tags):
+        if tags != self._tags:
+            self._tags = tags
+            self.tagsChanged.emit(self._tags)
 
     @pyqtProperty('QVariant', notify=changesChanged)
     def changes(self):
