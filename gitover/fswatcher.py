@@ -284,15 +284,21 @@ class FsWatcher(QProcess):
         self._path = path
         self._tracked_paths = set()
         self._buffer = bytes()
-        self.setProcessChannelMode(QProcess.ForwardedErrorChannel)
         self.setWorkingDirectory(self._path)
-        cmd = "fswatch -0 -m fsevents_monitor ."
+        cmd = "\"{}\" -0 -m fsevents_monitor \"{}\"".format(self.executable(), self._path)
+        self.readyReadStandardError.connect(self._onStderr)
         self.readyReadStandardOutput.connect(self._onStdout)
+        self.finished.connect(self._onFinished)
         LOGGER.info("Starting fswatch for {}...".format(self._path))
         self.start(cmd)
         self.waitForStarted()
-        LOGGER.info("Started fswatch for {}".format(self._path))
+        LOGGER.info("Started fswatch PID={} for {}".format(self.processId(), self._path))
         self._running = True
+
+    @pyqtSlot(int, QProcess.ExitStatus)
+    def _onFinished(self, exit_code, exit_status):
+        LOGGER.debug("fswatch terminated for {}: exitcode={} exitstatus={}"
+                     .format(self._path, exit_code, exit_status))
 
     @pyqtSlot()
     def _stop(self):
@@ -341,6 +347,15 @@ class FsWatcher(QProcess):
             path, self._buffer = self._buffer.split(NUL, maxsplit=1)
             paths.add(path.decode('utf-8'))
         for path in paths:
+            LOGGER.debug("Check change for {} in {}".format(path, self._path))
             if self.isTracked(path):
-                LOGGER.debug("Got change for {} in {}".format(path, self._path))
+                LOGGER.debug("Change of {} in {}".format(path, self._path))
                 self.pathChanged.emit(path)
+
+    @pyqtSlot()
+    def _onStderr(self):
+        """Handle error output of `fswatch`."""
+        self._err_buffer += bytes(self.readAllStandardOutput())
+        while "\n" in self._err_buffer:
+            line, self._err_buffer = self._err_buffer.split("\n", maxsplit=1)
+            LOGGER.error(line)
