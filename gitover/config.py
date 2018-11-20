@@ -1,5 +1,7 @@
+import multiprocessing
 import os
 import logging
+
 import yaml
 
 LOGGER = logging.getLogger(__name__)
@@ -39,10 +41,18 @@ class Config(object):
             LOGGER.exception("Failed to load configuration {}".format(cfgPath))
             return False
 
+    def to_bool(self, value):
+        return str(value).lower().strip() in ("yes", "true", "ok", "on")
+
     def general(self):
         """Returns dict of general options"""
         general = self._cfg.get("general", {})
+        general["debug-log"] = general.get("debug-log", "")
+        general["task-concurrency"] = int(general.get("task_concurrency",
+                                                      multiprocessing.cpu_count() * 2))
         general["git"] = general.get("git", "")
+        general["fswatch"] = general.get("fswatch", "fswatch")
+        general["fswatch-singleton"] = self.to_bool(general.get("fswatch-singleton", "yes"))
         return general
 
     def _init_tool(self, tool):

@@ -11,6 +11,8 @@ from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QFileSystemModel
 
+from gitover.config import Config
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -32,11 +34,21 @@ class RepoFsWatcher(QObject):
         self._flushChangesTimer.setSingleShot(True)
         self._flushChangesTimer.timeout.connect(self._onFlushChanges)
 
+        cfg = Config()
+        cfg.load(os.path.expanduser("~"))
+        fswatch_root_path_only = cfg.general()["fswatch-singleton"]
+        if fswatch_root_path_only and FsWatcher.supported():
+            self._fswatcher = FsWatcher("/", self)
+        else:
+            self._fswatcher = None
+
     @pyqtSlot(str)
     def startTracking(self, path):
-        tracker = RepoTracker(path, self)
+        tracker = RepoTracker(path, self._fswatcher, self)
         self._trackers += [tracker]
         tracker.repoChanged.connect(self._onRepoChanged)
+        if self._fswatcher:
+            self._fswatcher.track(path)
 
     def _onRepoChanged(self, path):
         self._changes.add(path)
@@ -53,13 +65,15 @@ class RepoFsWatcher(QObject):
             tracker.stop()
             tracker.deleteLater()
         self._trackers = []
+        if self._fswatcher:
+            self._fswatcher.stop()
 
 
 class RepoTracker(QObject):
     # signal gets emitted when content of repository has changed
     repoChanged = pyqtSignal(str)
 
-    def __init__(self, path, parent=None):
+    def __init__(self, path, fswatcher=None, parent=None):
         super().__init__(parent)
         self._path = path
         self._name = os.path.basename(self._path)
@@ -70,14 +84,24 @@ class RepoTracker(QObject):
         distinct_git_dir = not (self._git_dir + os.sep).startswith(self._working_dir)
         self._initial_mtime = time.time()
         self._mods = {}
-        if FsWatcher.supported():
+        self._fsStop = bool(fswatcher)
+        self._fsRoot = None
+        self._fsGit = None
+        if fswatcher:
+            self._fsRoot = fswatcher
+            self._fsRoot.pathChanged.connect(self._update)
+            self._fsRoot.track(self._working_dir)
+        elif FsWatcher.supported():
             self._fsRoot = FsWatcher(self._working_dir, self)
             self._fsRoot.pathChanged.connect(self._update)
         else:
             self._fsRoot = self._createFsModel(self._working_dir,
                                                self._onRootDirLoaded, self._onRootAboutToBeRemoved)
         if distinct_git_dir:
-            if FsWatcher.supported():
+            if fswatcher:
+                self._fsGit = fswatcher
+                self._fsGit.track(self._git_dir)
+            elif FsWatcher.supported():
                 self._fsGit = FsWatcher(self._git_dir, self)
                 self._fsGit.pathChanged.connect(self._update)
             else:
@@ -88,9 +112,14 @@ class RepoTracker(QObject):
 
     def stop(self):
         if isinstance(self._fsRoot, FsWatcher):
-            self._fsRoot.stop()
+            self._fsRoot.untrack(self._working_dir)
+            if self._fsStop:
+                self._fsRoot.stop()
+
         if isinstance(self._fsGit, FsWatcher):
-            self._fsGit.stop()
+            self._fsGit.untrack(self._git_dir)
+            if self._fsStop:
+                self._fsGit.stop()
 
     def _createFsModel(self, path, onDirLoaded, onAboutToBeRemoved):
         fs = QFileSystemModel(self)
@@ -229,15 +258,22 @@ class FsWatcher(QProcess):
     _is_supported = None
 
     @classmethod
+    def executable(cls):
+        cfg = Config()
+        cfg.load(os.path.expanduser("~"))
+        exec = cfg.general()["fswatch"]
+        return exec if os.path.exists(exec) else None
+
+    @classmethod
     def supported(cls):
         if cls._is_supported is None:
-            exitcode, out = subprocess.getstatusoutput("fswatch --version")
-            if exitcode == 0:
-                LOGGER.info("Fswatch is supported: {}".format(out.split("\n")[0]))
-                cls._is_supported = True
-            else:
-                LOGGER.info("Fswatch not supported")
-                cls._is_supported = False
+            cls._is_supported = False
+            exec = cls.executable()
+            if exec:
+                exitcode, out = subprocess.getstatusoutput("{} --version".format(exec))
+                if exitcode == 0:
+                    LOGGER.info("Fswatch is supported: {}: {}".format(exec, out.split("\n")[0]))
+                    cls._is_supported = True
         return cls._is_supported
 
     def __init__(self, path, parent=None):
@@ -246,6 +282,7 @@ class FsWatcher(QProcess):
         self._triggerStop.connect(self._stop)
         self._running = False
         self._path = path
+        self._tracked_paths = set()
         self._buffer = bytes()
         self.setProcessChannelMode(QProcess.ForwardedErrorChannel)
         self.setWorkingDirectory(self._path)
@@ -267,12 +304,33 @@ class FsWatcher(QProcess):
             self.waitForFinished(1)
         self._running = False
 
+    def track(self, path):
+        if path not in self._tracked_paths:
+            LOGGER.info("Tracking {}".format(path))
+            self._tracked_paths.add(path)
+
+    def untrack(self, path):
+        if path in self._tracked_paths:
+            LOGGER.info("Untracking {}".format(path))
+            self._tracked_paths.remove(path)
+
+    def isTracked(self, path):
+        if not self._tracked_paths:
+            return True
+        for p in self._tracked_paths:
+            if p == path:
+                return True
+            if path.startswith(p + "/"):
+                return True
+        return False
+
     def stop(self):
-        LOGGER.info("Stopping fswatch for {}...".format(self._path))
-        self._triggerStop.emit()
-        while self._running:
-            QThread.sleep(0.1)
-        LOGGER.info("Stopped fswatch for {}".format(self._path))
+        if self._running:
+            LOGGER.info("Stopping fswatch for {}...".format(self._path))
+            self._triggerStop.emit()
+            while self._running:
+                QThread.sleep(0.1)
+            LOGGER.info("Stopped fswatch for {}".format(self._path))
 
     @pyqtSlot()
     def _onStdout(self):
@@ -283,5 +341,6 @@ class FsWatcher(QProcess):
             path, self._buffer = self._buffer.split(NUL, maxsplit=1)
             paths.add(path.decode('utf-8'))
         for path in paths:
-            LOGGER.debug("Got change for {} in {}".format(path, self._path))
-            self.pathChanged.emit(path)
+            if self.isTracked(path):
+                LOGGER.debug("Got change for {} in {}".format(path, self._path))
+                self.pathChanged.emit(path)

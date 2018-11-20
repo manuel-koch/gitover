@@ -66,7 +66,7 @@ def reposition_window(wnd):
     position_window(wnd, x, y)
 
 
-def run_gui(repo_paths, watch_filesystem):
+def run_gui(repo_paths, watch_filesystem, nof_bg_threads):
     """Run GUI application"""
     LOGGER.info("Starting...")
 
@@ -79,7 +79,7 @@ def run_gui(repo_paths, watch_filesystem):
     app.setWindowIcon(QIcon(':/icon.png'))
 
     QThread.currentThread().setObjectName('mainThread')
-    QThreadPool.globalInstance().setMaxThreadCount(15)
+    QThreadPool.globalInstance().setMaxThreadCount(nof_bg_threads)
 
     wakeupWatcher = WakeupWatcher()
 

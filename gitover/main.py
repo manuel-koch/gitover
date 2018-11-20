@@ -23,9 +23,11 @@ Display over information of git repository and it's submodules.
 """
 import argparse
 import logging
+import os
 import signal
 import sys
 
+from gitover.config import Config
 from gitover.ui.mainwindow import run_gui
 
 ROOT_LOGGER = logging.getLogger(__name__.split(".")[0])
@@ -84,6 +86,15 @@ def main():
                          help="Don't watch filesystem changes in repositories.")
     args = parser.parse_args()
 
+    cfg = Config()
+    cfg.load(os.path.expanduser("~"))
+
+    if cfg.general()["debug-log"]:
+        path, ext = os.path.splitext(os.path.expanduser(cfg.general()["debug-log"]))
+        args.logPath = "{}_{:06d}{}".format(path, os.getpid(), ext)
+        args.verbose = True
+        args.detailedLog = True
+
     setupLogging(args.verbose, args.detailedLog, args.logPath)
 
     if sys.platform == "win32":
@@ -91,7 +102,9 @@ def main():
         # We want to handle it as interrupt instead
         signal.signal(signal.SIGBREAK, signal.default_int_handler)
 
-    return run_gui(repo_paths=args.repos, watch_filesystem=args.watchFs)
+    return run_gui(repo_paths=args.repos,
+                   watch_filesystem=args.watchFs,
+                   nof_bg_threads=cfg.general()["task-concurrency"])
 
 
 if __name__ == '__main__':

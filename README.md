@@ -63,7 +63,15 @@ status_commands:
 
 ### Section `general`
 
+`debug-log`: Create detailed logfile at given path
+
+`task-concurrency`: Use given number of background tasks for git actions like fetch/status or commit details
+
 `git`: Configure which git executable will be used
+
+`fswatch`: Configure which fswatch executable will be used
+
+`fswatch-singleton`: Only use one instance of fswatch to track all filesystem changes
 
 ### Section `repo_commands`
 
