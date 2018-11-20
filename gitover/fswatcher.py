@@ -347,7 +347,6 @@ class FsWatcher(QProcess):
             path, self._buffer = self._buffer.split(NUL, maxsplit=1)
             paths.add(path.decode('utf-8'))
         for path in paths:
-            LOGGER.debug("Check change for {} in {}".format(path, self._path))
             if self.isTracked(path):
                 LOGGER.debug("Change of {} in {}".format(path, self._path))
                 self.pathChanged.emit(path)
