@@ -22,7 +22,7 @@ Copyright 2017 Manuel Koch
 Data model for all repositiories.
 """
 import webbrowser
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import copy
 import datetime
 import logging
@@ -205,7 +205,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
     def _isRepo(self, path):
         try:
             if not os.path.isdir(path):
-                return False
+                raise FileNotFoundError()
             LOGGER.debug("Checking if path is a git repo {}".format(path))
             return bool(git.Repo(path).head)
         except:
@@ -296,6 +296,7 @@ class GitStatus(object):
         self.remoteBranches = []  # all remote branches that could be checked-out
         self.mergedToTrunkBranches = []  # all local branches that have been merged to trunk
         self.commits = []
+        self.commit_tags = {}  # key: commit, value: tag
         self.trackingBranch = ""  # tracking branch of current branch
         self.trackingBranchAhead = []  # list of commits that tracking branch is ahead of current branch
         self.trackingBranchBehind = []  # list of commits that tracking branch is behind of current branch
@@ -340,7 +341,12 @@ class GitStatus(object):
             return
 
         try:
-            self.commits = [c.hexsha for c in repo.iter_commits(max_count=50)]
+            self.commits = []
+            self.commit_tags = defaultdict(list)
+            for c in repo.iter_commits(max_count=50):
+                self.commits.append(c.hexsha)
+                self.commit_tags[c.hexsha] = [t.name for t in repo.tags
+                                              if c.hexsha == t.commit.hexsha]
         except:
             LOGGER.exception("Failed to get commits for {}".format(self.path))
 
@@ -1260,6 +1266,7 @@ class Repo(QObject, QmlTypeMixin):
     statusUpdated = pyqtSignal()
 
     commitDetails = pyqtSignal(object)
+    commitDetailChanged = pyqtSignal(str)  # detail info of given shahex commit changed
 
     error = pyqtSignal(str, arguments=["msg"])
 
@@ -1317,6 +1324,7 @@ class Repo(QObject, QmlTypeMixin):
         self._remote_branches = []
         self._merged_to_trunk_branches = []
         self._commits = []
+        self._commit_tags = {}
         self._remote_url = ""
 
         self._tracking_branch = ""
@@ -1534,6 +1542,7 @@ class Repo(QObject, QmlTypeMixin):
 
         self._rebaseWorker.checkRebasing()
         self.statusUpdated.emit()
+        self._set_commit_tags(status.commit_tags)
 
     def _config(self):
         cfg = Config()
@@ -1743,6 +1752,17 @@ class Repo(QObject, QmlTypeMixin):
         if self._commits != commits:
             self._commits = commits
             self.commitsChanged.emit(self._commits)
+
+    def _set_commit_tags(self, commit_tags):
+        outdated_commits = []
+        with self._commit_cache_lock:
+            for rev, tags in commit_tags.items():
+                if self._commit_tags.get(rev, []) != tags:
+                    outdated_commits.append(rev)
+            self._commit_tags = commit_tags
+        for rev in outdated_commits:
+            self._commit_cache.pop(rev, None)
+            self.commitDetailChanged.emit(rev)
 
     @pyqtProperty(str, notify=pathChanged)
     def path(self):
@@ -2001,6 +2021,11 @@ class CommitDetails(QObject):
             self._repository.workerSlot.cancel(self._runnable)
         self._runnable = None
 
+    @pyqtSlot(str)
+    def _onCommitDetailChanged(self, rev):
+        if rev == self.rev:
+            self._update()
+
     def _update(self):
         if not self._repository or not self._rev:
             self.shortrev = ""
@@ -2029,8 +2054,12 @@ class CommitDetails(QObject):
     @repository.setter
     def repository(self, repository):
         if repository != self._repository:
+            if self._repository:
+                self._repository.commitDetailChanged.disconnect(self._onCommitDetailChanged)
             self._repository = repository
             self.repositoryChanged.emit(self._repository)
+            if self._repository:
+                self._repository.commitDetailChanged.connect(self._onCommitDetailChanged)
             self._update()
 
     @pyqtProperty('QString', notify=revChanged)
