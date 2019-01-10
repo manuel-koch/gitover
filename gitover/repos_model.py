@@ -27,6 +27,7 @@ import copy
 import datetime
 import logging
 import os
+import pprint
 import random
 import string
 import subprocess
@@ -54,6 +55,18 @@ from gitover.config import Config
 LOGGER = logging.getLogger(__name__)
 
 ONE_MEGABYTE = 1024 * 1024
+
+
+def build_env_vars(override_vars):
+    env = os.environ.copy()
+    if "PYCHARM_HOSTED" in env:
+        # pycharm may introduce env vars that break pyenv tools we want to execute
+        # thus we remove them here unconditionally
+        for e in list(env.keys()):
+            if e.startswith("PYENV_"):
+                del env[e]
+    env.update(override_vars or {})
+    return env
 
 
 class ReposModel(QAbstractItemModel, QmlTypeMixin):
@@ -1613,7 +1626,7 @@ class Repo(QObject, QmlTypeMixin):
 
         self._execCustomCmd(name, tool["cmd"], path=path)
 
-    def _execCustomCmd(self, name, cmd, **vars):
+    def _execCustomCmd(self, name, cmd, env_vars=None, **vars):
         def substVar(txt, variables):
             """Substite named variables in given string"""
             for name, value in variables.items():
@@ -1629,9 +1642,13 @@ class Repo(QObject, QmlTypeMixin):
         if exe == "git" and exe != git.Git.GIT_PYTHON_GIT_EXECUTABLE:
             cmd = git.Git.GIT_PYTHON_GIT_EXECUTABLE + cmd[3:]
         cwd = self._path
-        LOGGER.info("Executing command {}:\n\tCommand: {}\n\tCwd: {}".format(name, cmd, cwd))
+        env = build_env_vars(env_vars)
+        env_lines = [f"{k}={v}" for k, v in env.items()]
+        env_lines = "\n".join([f"\t\t{l}" for l in env_lines])
+        LOGGER.info("Executing command {}:\n\tCommand: {}\n\tCwd: {}\n\tEnv:\n{}"
+                    .format(name, cmd, cwd, env_lines))
         subprocess.Popen(cmd, shell=True, cwd=cwd, stdin=subprocess.DEVNULL,
-                         executable="/bin/bash")
+                         env=env, executable="/bin/bash")
 
     @pyqtSlot(result=QVariant)
     def cmds(self):
