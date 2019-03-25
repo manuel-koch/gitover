@@ -203,7 +203,13 @@ Rectangle {
                 text:                   "..."
                 fgColor:                Theme.colors.badgeText
                 bgColor:                Theme.colors.badgeBusy
-                visible:                root.repository && root.repository.busy
+                visible:                root.repository && root.repository.busy &&
+                                        !(root.repository.updating ||
+                                          root.repository.fetching ||
+                                          root.repository.pulling ||
+                                          root.repository.checkingout ||
+                                          root.repository.rebasing ||
+                                          root.repository.pushing)
             }
         }
         LabelValueRow {
