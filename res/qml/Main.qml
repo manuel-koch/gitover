@@ -222,12 +222,21 @@ ApplicationWindow {
             }
             Tab {
                 title: "History"
-                BranchDetails {
-                    Layout.fillWidth: true
-                    repository:       theRepoGrid.repository
-                    title:            repository != null ? " Branch : " + repository.branch : ""
-                    commits:          repository != null ? repository.commits : null
-                    visible:          repository != null
+                ColumnLayout {
+                    anchors.fill:      parent
+                    anchors.topMargin: 2
+                    spacing:           2
+                    Text {
+                        text:           theRepoGrid.repository != null ? " Branch : " + theRepoGrid.repository.branch : ""
+                        font.bold:      true
+                        font.pointSize: 14
+                    }
+                    RepoCommitList {
+                        Layout.fillWidth:  true
+                        Layout.fillHeight: true
+                        repository:       theRepoGrid.repository
+                        visible:          theRepoGrid.repository != null
+                    }
                 }
             }
             Tab {

@@ -356,7 +356,7 @@ class GitStatus(object):
         try:
             self.commits = []
             self.commit_tags = defaultdict(list)
-            for c in repo.iter_commits(max_count=50):
+            for c in repo.iter_commits(max_count=100):
                 self.commits.append(c.hexsha)
                 self.commit_tags[c.hexsha] = [t.name for t in repo.tags
                                               if c.hexsha == t.commit.hexsha]

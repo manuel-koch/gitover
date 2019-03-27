@@ -10,6 +10,7 @@
     <file>qml/InputTextDialog.qml</file>
     <file>qml/LabelValueRow.qml</file>
     <file>qml/RepoActionBadge.qml</file>
+    <file>qml/RepoCommitList.qml</file>
     <file>qml/RepoMenu.qml</file>
     <file>qml/RepoOutput.qml</file>
     <file>qml/RepoStatusDiff.qml</file>
