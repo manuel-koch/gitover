@@ -335,7 +335,7 @@ class FsWatcher(QProcess):
             LOGGER.info("Stopping fswatch for {}...".format(self._path))
             self._triggerStop.emit()
             while self._running:
-                QThread.sleep(0.1)
+                QThread.msleep(50)
             LOGGER.info("Stopped fswatch for {}".format(self._path))
 
     @pyqtSlot()
