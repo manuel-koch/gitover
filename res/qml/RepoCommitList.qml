@@ -17,7 +17,7 @@
 //
 import QtQuick 2.6
 import QtQuick.Layouts 1.2
-import QtQuick.Controls 1.4
+import QtQuick.Controls 2.5
 import Gitover 1.0
 import "."
 
@@ -52,6 +52,8 @@ Item {
         highlight: Rectangle {
             color: Theme.colors.selectedRepoBg
         }
+
+        ScrollBar.vertical: ScrollBar { }
 
         delegate: Item {
             id: theDelegate
