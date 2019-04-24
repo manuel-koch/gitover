@@ -102,34 +102,6 @@ Rectangle {
                     onLinkActivated: repository.triggerCheckoutBranch(modelData)
                 }
             }
-            BranchDetails {
-                Layout.fillWidth: true
-                title:            "Tracking" + ((repository != null && repository.trunkBranch == repository.trackingBranch) ? "/Trunk" : "") + " branch is " + (repository != null ? repository.trackingBranchAhead : 0)+ " commit(s) ahead :"
-                repository:       root.repository
-                commits:          repository != null ? repository.trackingBranchAheadCommits : null
-                visible:          repository != null && repository.trackingBranchAhead
-            }
-            BranchDetails {
-                Layout.fillWidth: true
-                title:            "Tracking" + ((repository != null && repository.trunkBranch == repository.trackingBranch) ? "/Trunk" : "") + " branch is " + (repository != null ? repository.trackingBranchBehind : 0)+ " commit(s) behind :"
-                repository:       root.repository
-                commits:          repository != null ? repository.trackingBranchBehindCommits : null
-                visible:          repository != null && repository.trackingBranchBehind
-            }
-            BranchDetails {
-                Layout.fillWidth: true
-                title:            "Trunk branch is " + (repository != null ? repository.trunkBranchAhead : 0)+ " commit(s) ahead :"
-                repository:       root.repository
-                commits:          repository != null ? repository.trunkBranchAheadCommits : null
-                visible:          repository != null && repository.trunkBranchAhead && (repository.trunkBranch != repository.trackingBranch)
-            }
-            BranchDetails {
-                Layout.fillWidth: true
-                title:            "Trunk branch is " + (repository != null ? repository.trunkBranchBehind : 0)+ " commit(s) behind :"
-                repository:       root.repository
-                commits:          repository != null ? repository.trunkBranchBehindCommits : null
-                visible:          repository != null && repository.trunkBranchBehind && (repository.trunkBranch != repository.trackingBranch)
-            }
         }
     }
 }

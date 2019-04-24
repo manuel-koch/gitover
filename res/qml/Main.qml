@@ -261,6 +261,98 @@ ApplicationWindow {
                 }
             }
             Tab {
+                title: "Trunk / Tracking"
+                TabView {
+                    id: theTabView
+                    Layout.fillWidth:  true
+                    Layout.fillHeight: true
+                    Tab {
+                        title: "Trunk " + (theRepoGrid.repository != null ? theRepoGrid.repository.trunkBranchAhead : 0) + " ahead"
+                        ColumnLayout {
+                            anchors.fill:      parent
+                            anchors.topMargin: 2
+                            spacing:           2
+                            Text {
+                                text:           "Trunk branch is " + (theRepoGrid.repository != null ? theRepoGrid.repository.trunkBranchAhead : 0) + " commit(s) ahead :"
+                                font.bold:      true
+                                font.pointSize: 14
+                                visible:        theRepoGrid.repository != null
+                            }
+                            RepoCommitList {
+                                Layout.fillWidth:  true
+                                Layout.fillHeight: true
+                                repository:       theRepoGrid.repository
+                                commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trunkBranchAheadCommits : null
+                                visible:          theRepoGrid.repository != null
+                            }
+                        }
+                    }
+                    Tab {
+                        title: "Trunk " + (theRepoGrid.repository != null ? theRepoGrid.repository.trunkBranchBehind : 0) + " behind"
+                        ColumnLayout {
+                            anchors.fill:      parent
+                            anchors.topMargin: 2
+                            spacing:           2
+                            Text {
+                                text:           "Trunk branch is " + (theRepoGrid.repository != null ? theRepoGrid.repository.trunkBranchBehind : 0) + " commit(s) behind :"
+                                font.bold:      true
+                                font.pointSize: 14
+                                visible:        theRepoGrid.repository != null
+                            }
+                            RepoCommitList {
+                                Layout.fillWidth:  true
+                                Layout.fillHeight: true
+                                repository:       theRepoGrid.repository
+                                commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trunkBranchBehindCommits : null
+                                visible:          theRepoGrid.repository != null
+                            }
+                        }
+                    }
+                    Tab {
+                        title: "Tracking " + (theRepoGrid.repository != null ? theRepoGrid.repository.trackingBranchAhead : 0) + " ahead"
+                        ColumnLayout {
+                            anchors.fill:      parent
+                            anchors.topMargin: 2
+                            spacing:           2
+                            Text {
+                                text:           "Tracking branch is " + (theRepoGrid.repository != null ? theRepoGrid.repository.trackingBranchAhead : 0) + " commit(s) ahead :"
+                                font.bold:      true
+                                font.pointSize: 14
+                                visible:        theRepoGrid.repository != null
+                            }
+                            RepoCommitList {
+                                Layout.fillWidth:  true
+                                Layout.fillHeight: true
+                                repository:       theRepoGrid.repository
+                                commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trackingBranchAheadCommits : null
+                                visible:          theRepoGrid.repository != null
+                            }
+                        }
+                    }
+                    Tab {
+                        title: "Tracking " + (theRepoGrid.repository != null ? theRepoGrid.repository.trackingBranchBehind : 0) + " behind"
+                        ColumnLayout {
+                            anchors.fill:      parent
+                            anchors.topMargin: 2
+                            spacing:           2
+                            Text {
+                                text:           "Tracking branch is " + (theRepoGrid.repository != null ? theRepoGrid.repository.trackingBranchBehind : 0) + " commit(s) behind :"
+                                font.bold:      true
+                                font.pointSize: 14
+                                visible:        theRepoGrid.repository != null
+                            }
+                            RepoCommitList {
+                                Layout.fillWidth:  true
+                                Layout.fillHeight: true
+                                repository:       theRepoGrid.repository
+                                commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trackingBranchBehindCommits : null
+                                visible:          theRepoGrid.repository != null
+                            }
+                        }
+                    }
+                }
+            }
+            Tab {
                 title: "Output"
                 RepoOutput {
                     id: theRepoOutput
