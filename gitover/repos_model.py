@@ -520,7 +520,7 @@ class WorkerRunnable(QRunnable):
 
     def run(self):
         try:
-            if not self.abort:
+            if not self.abort and getattr(self, "_func", None):
                 self._func(*self._args, **self._kwargs)
         except:
             LOGGER.exception("Worker runnable failed")
