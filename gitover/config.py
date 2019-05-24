@@ -35,7 +35,7 @@ class Config(object):
             return False
         try:
             LOGGER.debug("Loading config from {}".format(cfgPath))
-            self._cfg = yaml.load(open(cfgPath, "rb"))
+            self._cfg = yaml.load(open(cfgPath, "rb"), Loader=yaml.SafeLoader)
             return True
         except:
             LOGGER.exception("Failed to load configuration {}".format(cfgPath))
