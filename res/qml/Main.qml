@@ -91,6 +91,7 @@ ApplicationWindow {
 
     AboutDialog {
         id: theAboutDialog
+        objectName: "theAboutDialog"
     }
 
     QtObject {

@@ -24,7 +24,7 @@ Main window of git overview.
 import logging
 
 from PyQt5 import QtCore
-from PyQt5.QtCore import Qt, qInstallMessageHandler, QThreadPool
+from PyQt5.QtCore import Qt, qInstallMessageHandler, QThreadPool, QTimer, QMetaObject, QObject
 from PyQt5.QtCore import QThread
 from PyQt5.QtCore import QSettings
 from PyQt5.QtGui import QGuiApplication, QIcon
@@ -59,11 +59,42 @@ def position_window(wnd, x, y):
         wnd.setProperty("y", y)
 
 
+def size_window(wnd, w, h):
+    if w is not None:
+        wnd.setProperty("width", w)
+    if h is not None:
+        wnd.setProperty("height", h)
+
+
 def reposition_window(wnd):
+    LOGGER.info("Workaround: reposition window")
     x = wnd.x()
     y = wnd.y()
     position_window(wnd, x + 1, y + 1)
     position_window(wnd, x, y)
+
+
+def resize_window(wnd):
+    LOGGER.info("Workaround: resize window")
+    w = wnd.width()
+    h = wnd.height()
+    size_window(wnd, w - 32, h - 32)
+    size_window(wnd, w, h)
+
+
+def open_and_close_about_dlg(wnd):
+    LOGGER.info("Workaround: opening about dialog")
+    aboutDialog = wnd.findChildren(QObject, "theAboutDialog")[0]
+    try:
+        QMetaObject.invokeMethod(aboutDialog, "openDialog")
+        QTimer.singleShot(50, lambda: QMetaObject.invokeMethod(aboutDialog, "closeDialog"))
+    except:
+        LOGGER.exception("Failed to apply workaround")
+
+
+def fix_hanging_qml_renderer(wnd):
+    resize_window(wnd)
+    open_and_close_about_dlg(wnd)
 
 
 def run_gui(repo_paths, watch_filesystem, nof_bg_threads):
@@ -76,9 +107,9 @@ def run_gui(repo_paths, watch_filesystem, nof_bg_threads):
     app.setOrganizationDomain("mko.com")
     app.setApplicationName("GitOver")
     app.setApplicationVersion("{}".format(gitover_version))
-    app.setWindowIcon(QIcon(':/icon.png'))
+    app.setWindowIcon(QIcon(":/icon.png"))
 
-    QThread.currentThread().setObjectName('mainThread')
+    QThread.currentThread().setObjectName("mainThread")
     QThreadPool.globalInstance().setMaxThreadCount(nof_bg_threads)
 
     wakeupWatcher = WakeupWatcher()
@@ -121,6 +152,9 @@ def run_gui(repo_paths, watch_filesystem, nof_bg_threads):
 
     # workaround context menus at wrong position after wakeup from sleeping !?
     wakeupWatcher.awake.connect(lambda: reposition_window(wnd))
+
+    # workaround QML renderer that appears stuck
+    wakeupWatcher.awake.connect(lambda: fix_hanging_qml_renderer(wnd))
 
     # Run the application
     result = app.exec_()

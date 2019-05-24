@@ -25,6 +25,7 @@ class WakeupWatcher(QObject):
     def _ping(self):
         now = datetime.datetime.utcnow()
         dt = (now - self._last_ping) if self._last_ping else datetime.timedelta()
-        if dt.total_seconds() > self.period_seconds * 1.10:
+        if dt.total_seconds() > 30:
+            LOGGER.info(f"Appears awake after {dt}")
             self.awake.emit()
         self._last_ping = now
