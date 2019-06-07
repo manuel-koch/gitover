@@ -119,7 +119,10 @@ It may still run when starting it explicitly on console.
 Cause may be misconfigured or not yet installed XCode stuff after Mac OSX upgrade ( i.e. to High Sierra ).
 You may need to reinstall XCode stuff to get git working again, [see][6].
 
+## Build / bundle prerequisites
 
+* `pip install --upgrade pip`
+* `pip install pip-tools wheel`
 
 [1]: https://docs.python.org "Python"
 [2]: http://pyqt.sourceforge.net/Docs/PyQt5/ "PyQt5"
