@@ -224,7 +224,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         except:
             LOGGER.exception("Path is not a git repo: {}".format(path))
 
-    @pyqtSlot('QUrl')
+    @pyqtSlot("QUrl")
     def addRepoByUrl(self, url):
         self.addRepoByPath(url.toLocalFile(), saveAsRecent=True)
 
@@ -253,12 +253,13 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         self._repos.insert(insert_idx, repo)
         self.endInsertRows()
         self.nofReposChanged.emit(self.nofRepos)
+        repo.close.connect(self._onClose)
 
         rootpath = repo.path
         LOGGER.info("Searching sub repos of {}".format(rootpath))
         subpaths = list(filter(self._isRepo, [r.abspath for r in git.Repo(rootpath).submodules]))
         for subpath in subpaths:
-            name = subpath[len(rootpath) + 1:]
+            name = subpath[len(rootpath) + 1 :]
             self._queued_path += [(subpath, name)]
 
         if self._watchFs:
@@ -299,6 +300,19 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
                 repo.triggerUpdate()
                 return
 
+    def _onClose(self):
+        # remove repo from model
+        repo = self.sender()
+        LOGGER.info(f"Closing repo {repo}")
+        idx = self._repos.index(repo)
+        self.beginRemoveRows(QModelIndex(), idx, idx)
+        self._repos.remove(repo)
+        self.endRemoveRows()
+        self.nofReposChanged.emit(self.nofRepos)
+        if self._watchFs:
+            self._fsWatcher.untrack.emit(repo.path)
+        repo.deleteLater()
+
 
 class GitStatus(object):
     def __init__(self, path):
@@ -311,8 +325,12 @@ class GitStatus(object):
         self.commits = []
         self.commit_tags = {}  # key: commit, value: tag
         self.trackingBranch = ""  # tracking branch of current branch
-        self.trackingBranchAhead = []  # list of commits that tracking branch is ahead of current branch
-        self.trackingBranchBehind = []  # list of commits that tracking branch is behind of current branch
+        self.trackingBranchAhead = (
+            []
+        )  # list of commits that tracking branch is ahead of current branch
+        self.trackingBranchBehind = (
+            []
+        )  # list of commits that tracking branch is behind of current branch
         self.trunkBranch = ""  # trunk branch of repository
         self.trunkBranchAhead = []  # list of commits that trunk branch is ahead of current branch
         self.trunkBranchBehind = []  # list of commits that trunk branch is ahead of current branch
@@ -358,8 +376,9 @@ class GitStatus(object):
             self.commit_tags = defaultdict(list)
             for c in repo.iter_commits(max_count=100):
                 self.commits.append(c.hexsha)
-                self.commit_tags[c.hexsha] = [t.name for t in repo.tags
-                                              if c.hexsha == t.commit.hexsha]
+                self.commit_tags[c.hexsha] = [
+                    t.name for t in repo.tags if c.hexsha == t.commit.hexsha
+                ]
         except:
             LOGGER.exception("Failed to get commits for {}".format(self.path))
 
@@ -382,13 +401,18 @@ class GitStatus(object):
 
         try:
             trackedBranches = [self._trackingBranch(repo, b) for b in self.branches]
-            allRemoteBranches = [r.name for r in repo.references
-                                 if isinstance(r, git.RemoteReference) and
-                                 r.name != (r.remote_name + "/HEAD")]
-            availRemoteBranches = [r.name for r in repo.references
-                                   if isinstance(r, git.RemoteReference) and
-                                   r.name != (r.remote_name + "/HEAD") and
-                                   r.name not in trackedBranches]
+            allRemoteBranches = [
+                r.name
+                for r in repo.references
+                if isinstance(r, git.RemoteReference) and r.name != (r.remote_name + "/HEAD")
+            ]
+            availRemoteBranches = [
+                r.name
+                for r in repo.references
+                if isinstance(r, git.RemoteReference)
+                and r.name != (r.remote_name + "/HEAD")
+                and r.name not in trackedBranches
+            ]
             availRemoteBranches.sort(key=str.lower)
             self.remoteBranches = availRemoteBranches
         except:
@@ -402,12 +426,18 @@ class GitStatus(object):
                     self.trackingBranchAhead = ahead
                     self.trackingBranchBehind = behind
         except:
-            LOGGER.exception("Failed to get tracking branch '{}' ahead/behind counters for {}"
-                             .format(self.trackingBranch, self.path))
+            LOGGER.exception(
+                "Failed to get tracking branch '{}' ahead/behind counters for {}".format(
+                    self.trackingBranch, self.path
+                )
+            )
 
         try:
-            trunkBranches = [repo.git.config("gitover.trunkbranch", with_exceptions=False),
-                             "origin/develop", "origin/master"]
+            trunkBranches = [
+                repo.git.config("gitover.trunkbranch", with_exceptions=False),
+                "origin/develop",
+                "origin/master",
+            ]
             while trunkBranches and trunkBranches[0] not in set(allRemoteBranches + branches):
                 trunkBranches.pop(0)
             self.trunkBranch = trunkBranches[0] if trunkBranches else ""
@@ -419,8 +449,11 @@ class GitStatus(object):
             self.trunkBranchAhead = ahead
             self.trunkBranchBehind = behind
         except:
-            LOGGER.exception("Failed to get trunk branch '{}' ahead/behind counters for {}"
-                             .format(self.trunkBranch, self.path))
+            LOGGER.exception(
+                "Failed to get trunk branch '{}' ahead/behind counters for {}".format(
+                    self.trunkBranch, self.path
+                )
+            )
 
         self.untracked = set(repo.untracked_files)
         for diff in repo.index.diff(other=None):  # diff against working tree
@@ -433,7 +466,9 @@ class GitStatus(object):
             unmergedBlobs = repo.index.unmerged_blobs()
             for path in unmergedBlobs:
                 for (stage, dummyBlob) in unmergedBlobs[path]:
-                    if stage != 0:  # anything else than zero indicates a conflict that must be resolved
+                    if (
+                        stage != 0
+                    ):  # anything else than zero indicates a conflict that must be resolved
                         self.conflicts.add(path)
         except:
             pass  # unmerged_blobs() seems to raise an exception when there are no conflicts !?
@@ -452,12 +487,14 @@ class GitStatus(object):
         try:
             merged_branches = []
             if self.trunkBranch:
-                merged_branches = [b.replace("*", "").strip()
-                                   for b in
-                                   repo.git.branch(self.trunkBranch, merged=True).split("\n")]
+                merged_branches = [
+                    b.replace("*", "").strip()
+                    for b in repo.git.branch(self.trunkBranch, merged=True).split("\n")
+                ]
             merged_branches = [(b, self._trackingBranch(repo, b)) for b in merged_branches]
-            self.mergedToTrunkBranches = [b[0] for b in merged_branches
-                                          if self.trunkBranch not in b]
+            self.mergedToTrunkBranches = [
+                b[0] for b in merged_branches if self.trunkBranch not in b
+            ]
         except:
             LOGGER.exception("Failed to detect branches that are already merged to trunk")
 
@@ -606,8 +643,14 @@ class GitFetchWorker(QObject):
             repo = git.Repo(path)
             remote_url = repo.git.config("remote.origin.url", local=True, with_exceptions=False)
             if remote_url:
-                proc = repo.git.fetch("origin", prune=True, no_recurse_submodules=True,
-                                      verbose=True, with_extended_output=True, as_process=True)
+                proc = repo.git.fetch(
+                    "origin",
+                    prune=True,
+                    no_recurse_submodules=True,
+                    verbose=True,
+                    with_extended_output=True,
+                    as_process=True,
+                )
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
             else:
                 LOGGER.warning("Skipped fetching git repo at {}: missing remote url".format(path))
@@ -653,24 +696,26 @@ class GitPullWorker(QObject):
 
             err_hint = "stash save"
             stash_name = "Automatic stash before pull: {}".format(
-                "".join(random.sample(string.ascii_letters + string.digits, 32)))
+                "".join(random.sample(string.ascii_letters + string.digits, 32))
+            )
             dirty = repo.is_dirty()
             if dirty:
-                proc = repo.git.stash("save", stash_name,
-                                      with_extended_output=True, as_process=True)
+                proc = repo.git.stash(
+                    "save", stash_name, with_extended_output=True, as_process=True
+                )
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
             err_hint = "pull"
-            proc = repo.git.pull(prune=True,
-                                 verbose=True, with_extended_output=True, as_process=True)
+            proc = repo.git.pull(
+                prune=True, verbose=True, with_extended_output=True, as_process=True
+            )
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
             err_hint = "stash pop"
             stashed = repo.git.stash("list").split("\n")
             stashed = stash_name in stashed[0] if stashed else False
             if stashed:
-                proc = repo.git.stash("pop",
-                                      with_extended_output=True, as_process=True)
+                proc = repo.git.stash("pop", with_extended_output=True, as_process=True)
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
         except:
@@ -722,24 +767,24 @@ class GitCheckoutWorker(QObject):
 
             err_hint = "stash save"
             stash_name = "Automatic stash before checkout: {}".format(
-                "".join(random.sample(string.ascii_letters + string.digits, 32)))
+                "".join(random.sample(string.ascii_letters + string.digits, 32))
+            )
             dirty = repo.is_dirty()
             if dirty:
-                proc = repo.git.stash("save", stash_name,
-                                      with_extended_output=True, as_process=True)
+                proc = repo.git.stash(
+                    "save", stash_name, with_extended_output=True, as_process=True
+                )
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
             err_hint = "checkout"
-            proc = repo.git.checkout(branch,
-                                     with_extended_output=True, as_process=True)
+            proc = repo.git.checkout(branch, with_extended_output=True, as_process=True)
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
             err_hint = "stash pop"
             stashed = repo.git.stash("list").split("\n")
             stashed = stash_name in stashed[0] if stashed else False
             if stashed:
-                proc = repo.git.stash("pop",
-                                      with_extended_output=True, as_process=True)
+                proc = repo.git.stash("pop", with_extended_output=True, as_process=True)
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
         except:
@@ -764,12 +809,12 @@ class GitCheckoutWorker(QObject):
             repo = git.Repo(self._path)
 
             err_hint = "create branch"
-            proc = repo.git.checkout("-b", branch,
-                                     with_extended_output=True, as_process=True)
+            proc = repo.git.checkout("-b", branch, with_extended_output=True, as_process=True)
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
         except:
             LOGGER.exception(
-                "Failed to create branch {} in git repo at {}".format(branch, self._path))
+                "Failed to create branch {} in git repo at {}".format(branch, self._path)
+            )
             self.error.emit("Failed to " + err_hint)
         finally:
             self.checkoutprogress.emit(False)
@@ -785,12 +830,12 @@ class GitCheckoutWorker(QObject):
             repo = git.Repo(self._path)
 
             err_hint = "delete branch"
-            proc = repo.git.branch("-D", branch,
-                                   with_extended_output=True, as_process=True)
+            proc = repo.git.branch("-D", branch, with_extended_output=True, as_process=True)
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
         except:
             LOGGER.exception(
-                "Failed to delete branch {} in git repo at {}".format(branch, self._path))
+                "Failed to delete branch {} in git repo at {}".format(branch, self._path)
+            )
             self.error.emit("Failed to " + err_hint)
         finally:
             self.checkoutprogress.emit(False)
@@ -811,13 +856,13 @@ class GitCheckoutWorker(QObject):
             merge_conflict = repo.git.status(path, porcelain=True).strip().split()[0] == "UU"
             if merge_conflict:
                 err_hint = "reset"
-                proc = repo.git.reset("--", path,
-                                      with_extended_output=True, as_process=True)
+                proc = repo.git.reset("--", path, with_extended_output=True, as_process=True)
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
             err_hint = "checkout"
-            proc = repo.git.checkout("--", path, force=True,
-                                     with_extended_output=True, as_process=True)
+            proc = repo.git.checkout(
+                "--", path, force=True, with_extended_output=True, as_process=True
+            )
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
         except:
             LOGGER.exception("Failed to checkout {} in git repo at {}".format(path, self._path))
@@ -836,8 +881,7 @@ class GitCheckoutWorker(QObject):
             repo = git.Repo(self._path)
 
             err_hint = "add"
-            proc = repo.git.add("--", path,
-                                with_extended_output=True, as_process=True)
+            proc = repo.git.add("--", path, with_extended_output=True, as_process=True)
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
         except:
             LOGGER.exception("Failed to add {} in git repo at {}".format(path, self._path))
@@ -855,8 +899,7 @@ class GitCheckoutWorker(QObject):
             repo = git.Repo(self._path)
 
             err_hint = "unstage"
-            proc = repo.git.reset("--", path,
-                                  with_extended_output=True, as_process=True)
+            proc = repo.git.reset("--", path, with_extended_output=True, as_process=True)
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
         except:
             LOGGER.exception("Failed to unstage {} in git repo at {}".format(path, self._path))
@@ -889,8 +932,10 @@ class GitRebaseWorker(QObject):
         self._repo = git.Repo(self._path)
         self._rebasing = False
         self._rebaseStash = ""
-        self._testPaths = [os.path.join(self._repo.git_dir, "rebase-merge", "done"),
-                           os.path.join(self._repo.git_dir, "rebase-apply", "rebasing")]
+        self._testPaths = [
+            os.path.join(self._repo.git_dir, "rebase-merge", "done"),
+            os.path.join(self._repo.git_dir, "rebase-apply", "rebasing"),
+        ]
 
     def checkRebasing(self):
         self._workerSlot.schedule(self._onCheckRebasing)
@@ -910,9 +955,11 @@ class GitRebaseWorker(QObject):
         dirty = self._repo.is_dirty()
         if dirty:
             self._rebaseStash = "Automatic stash before rebase: {}".format(
-                "".join(random.sample(string.ascii_letters + string.digits, 32)))
-            proc = self._repo.git.stash("save", self._rebaseStash,
-                                        with_extended_output=True, as_process=True)
+                "".join(random.sample(string.ascii_letters + string.digits, 32))
+            )
+            proc = self._repo.git.stash(
+                "save", self._rebaseStash, with_extended_output=True, as_process=True
+            )
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
     def _stashPop(self):
@@ -922,8 +969,7 @@ class GitRebaseWorker(QObject):
         stashed = self._repo.git.stash("list").split("\n")
         stashed = self._rebaseStash in stashed[0] if stashed else False
         if stashed:
-            proc = self._repo.git.stash("pop",
-                                        with_extended_output=True, as_process=True)
+            proc = self._repo.git.stash("pop", with_extended_output=True, as_process=True)
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
         self._rebaseStash = ""
 
@@ -949,8 +995,9 @@ class GitRebaseWorker(QObject):
             try:
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
             except git.exc.GitCommandError as e:
-                LOGGER.error("Rebase git repo at {} failed or found conflicts: {}"
-                             .format(self._path, e))
+                LOGGER.error(
+                    "Rebase git repo at {} failed or found conflicts: {}".format(self._path, e)
+                )
                 self.error.emit("Failed to rebase")
 
             if not self.checkRebasing():
@@ -968,13 +1015,15 @@ class GitRebaseWorker(QObject):
                 return
             # can't use "continue" argument directly due to reserved keyword
             kwargs = {"continue": True}
-            proc = self._repo.git.rebase(**kwargs,
-                                         with_extended_output=True, as_process=True)
+            proc = self._repo.git.rebase(**kwargs, with_extended_output=True, as_process=True)
             try:
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
             except git.exc.GitCommandError as e:
-                LOGGER.error("Continue rebase git repo at {} failed or found conflicts: {}"
-                             .format(self._path, e))
+                LOGGER.error(
+                    "Continue rebase git repo at {} failed or found conflicts: {}".format(
+                        self._path, e
+                    )
+                )
                 self.error.emit("Failed to continue rebase")
 
             if not self.checkRebasing():
@@ -990,13 +1039,15 @@ class GitRebaseWorker(QObject):
         try:
             if not self._rebasing:
                 return
-            proc = self._repo.git.rebase(skip=True,
-                                         with_extended_output=True, as_process=True)
+            proc = self._repo.git.rebase(skip=True, with_extended_output=True, as_process=True)
             try:
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
             except git.exc.GitCommandError as e:
-                LOGGER.error("Skip rebase git repo at {} failed or found conflicts: {}"
-                             .format(self._path, e))
+                LOGGER.error(
+                    "Skip rebase git repo at {} failed or found conflicts: {}".format(
+                        self._path, e
+                    )
+                )
                 self.error.emit("Failed to skip rebase")
 
             if not self.checkRebasing():
@@ -1012,13 +1063,15 @@ class GitRebaseWorker(QObject):
         try:
             if not self._rebasing:
                 return
-            proc = self._repo.git.rebase(abort=True,
-                                         with_extended_output=True, as_process=True)
+            proc = self._repo.git.rebase(abort=True, with_extended_output=True, as_process=True)
             try:
                 handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
             except git.exc.GitCommandError as e:
-                LOGGER.error("Abort rebase git repo at {} failed or found conflicts: {}"
-                             .format(self._path, e))
+                LOGGER.error(
+                    "Abort rebase git repo at {} failed or found conflicts: {}".format(
+                        self._path, e
+                    )
+                )
                 self.error.emit("Failed to abort rebase")
 
             if not self.checkRebasing():
@@ -1066,8 +1119,9 @@ class GitPushWorker(QObject):
             if not repo.active_branch.name:
                 return
 
-            remote = repo.git.config("branch.{}.remote".format(repo.active_branch.name),
-                                     with_exceptions=False)
+            remote = repo.git.config(
+                "branch.{}.remote".format(repo.active_branch.name), with_exceptions=False
+            )
 
             kwargs = {}
             args = []
@@ -1078,8 +1132,7 @@ class GitPushWorker(QObject):
             if force:
                 kwargs["force"] = True
 
-            proc = repo.git.push(*args, **kwargs,
-                                 with_extended_output=True, as_process=True)
+            proc = repo.git.push(*args, **kwargs, with_extended_output=True, as_process=True)
             handle_process_output(proc, self._onOutput, self._onOutput, finalize_process)
 
         except:
@@ -1144,8 +1197,9 @@ class ChangedFilesModel(QAbstractItemModel, QmlTypeMixin):
 
         return None
 
-    def setChanges(self, modified=None, staged=None, deleted=None, conflicting=None,
-                   untracked=None):
+    def setChanges(
+        self, modified=None, staged=None, deleted=None, conflicting=None, untracked=None
+    ):
         self.beginResetModel()
         entries = []
         entries += [ChangedPath(p, "modified") for p in modified] if modified else []
@@ -1225,16 +1279,20 @@ class OutputModel(QAbstractItemModel, QmlTypeMixin):
         self.countChanged.emit(self.rowCount())
 
 
-CommitDetail = NamedTuple("CommitDetail", (("rev", str),
-                                           ("shortrev", str),
-                                           ("date", str),
-                                           ("user", str),
-                                           ("msg", str),
-                                           ("tags", list),
-                                           ("changes", list)))
+CommitDetail = NamedTuple(
+    "CommitDetail",
+    (
+        ("rev", str),
+        ("shortrev", str),
+        ("date", str),
+        ("user", str),
+        ("msg", str),
+        ("tags", list),
+        ("changes", list),
+    ),
+)
 
-CommitChange = NamedTuple("CommitChange", (("change", str),
-                                           ("path", str)))
+CommitChange = NamedTuple("CommitChange", (("change", str), ("path", str)))
 
 
 class Repo(QObject, QmlTypeMixin):
@@ -1284,6 +1342,8 @@ class Repo(QObject, QmlTypeMixin):
     error = pyqtSignal(str, arguments=["msg"])
 
     busyChanged = pyqtSignal(bool)
+
+    close = pyqtSignal()
 
     def __init__(self, path, name="", parent=None):
         super().__init__(parent)
@@ -1547,11 +1607,13 @@ class Repo(QObject, QmlTypeMixin):
         self.conflicts = len(status.conflicts)
         self.staged = len(status.staged)
 
-        self._changes.setChanges(modified=sorteditems(status.modified),
-                                 staged=sorteditems(status.staged),
-                                 deleted=sorteditems(status.deleted),
-                                 conflicting=sorteditems(status.conflicts),
-                                 untracked=sorteditems(status.untracked))
+        self._changes.setChanges(
+            modified=sorteditems(status.modified),
+            staged=sorteditems(status.staged),
+            deleted=sorteditems(status.deleted),
+            conflicting=sorteditems(status.conflicts),
+            untracked=sorteditems(status.untracked),
+        )
 
         self._rebaseWorker.checkRebasing()
         self.statusUpdated.emit()
@@ -1567,6 +1629,9 @@ class Repo(QObject, QmlTypeMixin):
         """Executes a named command for current repository"""
         cfg = self._config()
 
+        if name == "__close":
+            self.close.emit()
+            return
         if name == "__update":
             self.triggerUpdate()
             return
@@ -1633,10 +1698,14 @@ class Repo(QObject, QmlTypeMixin):
                 txt = txt.replace("{{{}}}".format(name), value)
             return txt
 
-        vars.update({"root": self._path,
-                     "branch": self._branch,
-                     "trackingbranch": self._tracking_branch,
-                     "trunkbranch": self._trunk_branch})
+        vars.update(
+            {
+                "root": self._path,
+                "branch": self._branch,
+                "trackingbranch": self._tracking_branch,
+                "trunkbranch": self._trunk_branch,
+            }
+        )
         cmd = substVar(cmd, vars)
         exe = cmd.split()[0]
         if exe == "git" and exe != git.Git.GIT_PYTHON_GIT_EXECUTABLE:
@@ -1645,16 +1714,23 @@ class Repo(QObject, QmlTypeMixin):
         env = build_env_vars(env_vars)
         env_lines = [f"{k}={v}" for k, v in env.items()]
         env_lines = "\n".join([f"\t\t{l}" for l in env_lines])
-        LOGGER.info("Executing command {}:\n\tCommand: {}\n\tCwd: {}\n\tEnv:\n{}"
-                    .format(name, cmd, cwd, env_lines))
-        subprocess.Popen(cmd, shell=True, cwd=cwd, stdin=subprocess.DEVNULL,
-                         env=env, executable="/bin/bash")
+        LOGGER.info(
+            "Executing command {}:\n\tCommand: {}\n\tCwd: {}\n\tEnv:\n{}".format(
+                name, cmd, cwd, env_lines
+            )
+        )
+        subprocess.Popen(
+            cmd, shell=True, cwd=cwd, stdin=subprocess.DEVNULL, env=env, executable="/bin/bash"
+        )
 
     @pyqtSlot(result=QVariant)
     def cmds(self):
         """Returns a list of dict with keys name,title to configure commands for current repository"""
-        cmds = [dict(name="__update", title="Refresh", shortcut="Ctrl+R"),
-                dict(name="__fetch", title="Fetch", shortcut="Ctrl+F")]
+        cmds = [
+            dict(name="__close", title="Close", shortcut="Ctrl+W"),
+            dict(name="__update", title="Refresh", shortcut="Ctrl+R"),
+            dict(name="__fetch", title="Fetch", shortcut="Ctrl+F"),
+        ]
         branchValid = self._branch in self._branches
         if branchValid:
             cmds.append(dict(name="__pull", title="Pull"))
@@ -1665,7 +1741,9 @@ class Repo(QObject, QmlTypeMixin):
             cmds.append(dict(name="__rebaseskip", title="Skip rebase"))
             cmds.append(dict(name="__rebaseabort", title="Abort rebase"))
         if branchValid:
-            updatedTrackingBranch = self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits
+            updatedTrackingBranch = (
+                self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits
+            )
             if not self._tracking_branch or updatedTrackingBranch:
                 cmds.append(dict(name="__push", title="Push"))
             if updatedTrackingBranch:
@@ -1687,14 +1765,14 @@ class Repo(QObject, QmlTypeMixin):
         of selected status in current repository
         """
         all_cmds = OrderedDict()
-        all_cmds["__revert"] = dict(title="Checkout / Revert",
-                                    statuses=("modified", "deleted", "conflict"))
-        all_cmds["__stage"] = dict(title="Stage / Add",
-                                   statuses=("modified", "untracked", "deleted"))
-        all_cmds["__discard"] = dict(title="Discard / Remove",
-                                     statuses=("untracked",))
-        all_cmds["__unstage"] = dict(title="Unstage / Reset",
-                                     statuses=("staged", "conflict"))
+        all_cmds["__revert"] = dict(
+            title="Checkout / Revert", statuses=("modified", "deleted", "conflict")
+        )
+        all_cmds["__stage"] = dict(
+            title="Stage / Add", statuses=("modified", "untracked", "deleted")
+        )
+        all_cmds["__discard"] = dict(title="Discard / Remove", statuses=("untracked",))
+        all_cmds["__unstage"] = dict(title="Unstage / Reset", statuses=("staged", "conflict"))
         cmds = []
         for cmd, config in all_cmds.items():
             if status in config["statuses"]:
@@ -1747,11 +1825,13 @@ class Repo(QObject, QmlTypeMixin):
                 tags = [t.name for t in repo.tags if c.hexsha == t.commit.hexsha]
                 msg = c.message.split("\n")[0].strip()
                 shortrev = repo.git.rev_parse(c.hexsha, short=8)
-                changes = repo.git.diff_tree(rev, no_commit_id=True, name_status=True,
-                                             r=True).split("\n")
+                changes = repo.git.diff_tree(
+                    rev, no_commit_id=True, name_status=True, r=True
+                ).split("\n")
                 changes = [CommitChange(*c.split("\t")) for c in changes if c.strip()]
-                cd = CommitDetail(rev, shortrev, str(c.committed_datetime), c.author.name, msg,
-                                  tags, changes)
+                cd = CommitDetail(
+                    rev, shortrev, str(c.committed_datetime), c.author.name, msg, tags, changes
+                )
                 self._commit_cache[rev] = cd
             while len(self._commit_cache) > self._commit_cache_max_size:
                 self._commit_cache.popitem(last=False)
@@ -2006,21 +2086,20 @@ class Repo(QObject, QmlTypeMixin):
 class CommitDetails(QObject):
     """Contains detail info of a commit"""
 
-    Change = NamedTuple("Change", (("change", str),
-                                   ("path", str)))
+    Change = NamedTuple("Change", (("change", str), ("path", str)))
 
     repositoryChanged = pyqtSignal(Repo)
-    revChanged = pyqtSignal('QString')
-    shortrevChanged = pyqtSignal('QString')
-    dateChanged = pyqtSignal('QString')
-    userChanged = pyqtSignal('QString')
-    msgChanged = pyqtSignal('QString')
-    tagsChanged = pyqtSignal('QStringList')
+    revChanged = pyqtSignal("QString")
+    shortrevChanged = pyqtSignal("QString")
+    dateChanged = pyqtSignal("QString")
+    userChanged = pyqtSignal("QString")
+    msgChanged = pyqtSignal("QString")
+    tagsChanged = pyqtSignal("QStringList")
     changesChanged = pyqtSignal(QVariant)
 
     @classmethod
     def registerToQml(cls):
-        qmlRegisterType(cls, 'Gitover', 1, 0, 'CommitDetails')
+        qmlRegisterType(cls, "Gitover", 1, 0, "CommitDetails")
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -2081,7 +2160,7 @@ class CommitDetails(QObject):
                 self._repository.commitDetailChanged.connect(self._onCommitDetailChanged)
             self._update()
 
-    @pyqtProperty('QString', notify=revChanged)
+    @pyqtProperty("QString", notify=revChanged)
     def rev(self):
         return self._rev
 
@@ -2092,7 +2171,7 @@ class CommitDetails(QObject):
             self.revChanged.emit(self._rev)
             self._update()
 
-    @pyqtProperty('QString', notify=shortrevChanged)
+    @pyqtProperty("QString", notify=shortrevChanged)
     def shortrev(self):
         return self._shortrev
 
@@ -2102,7 +2181,7 @@ class CommitDetails(QObject):
             self._shortrev = shortrev
             self.shortrevChanged.emit(self._shortrev)
 
-    @pyqtProperty('QString', notify=dateChanged)
+    @pyqtProperty("QString", notify=dateChanged)
     def date(self):
         return self._date
 
@@ -2112,7 +2191,7 @@ class CommitDetails(QObject):
             self._date = date
             self.dateChanged.emit(self._date)
 
-    @pyqtProperty('QString', notify=userChanged)
+    @pyqtProperty("QString", notify=userChanged)
     def user(self):
         return self._user
 
@@ -2122,7 +2201,7 @@ class CommitDetails(QObject):
             self._user = user
             self.userChanged.emit(self._user)
 
-    @pyqtProperty('QString', notify=msgChanged)
+    @pyqtProperty("QString", notify=msgChanged)
     def msg(self):
         return self._msg
 
@@ -2132,7 +2211,7 @@ class CommitDetails(QObject):
             self._msg = msg
             self.msgChanged.emit(self._msg)
 
-    @pyqtProperty('QStringList', notify=tagsChanged)
+    @pyqtProperty("QStringList", notify=tagsChanged)
     def tags(self):
         return self._tags
 
@@ -2142,7 +2221,7 @@ class CommitDetails(QObject):
             self._tags = tags
             self.tagsChanged.emit(self._tags)
 
-    @pyqtProperty('QVariant', notify=changesChanged)
+    @pyqtProperty("QVariant", notify=changesChanged)
     def changes(self):
         return self._changes
 
