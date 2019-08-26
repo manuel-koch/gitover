@@ -28,6 +28,10 @@ git interactions :
 * [PyInstaller][4], to bundle an easy to distribute application bundle
 * [fswatch][5], to track changes in filesystem
 
+## Screenshots
+
+![UI](res/screenshots/gitover.png)
+
 ## Customize GitOver
 
 GitOver uses a configuration file that can be placed in your home directory
@@ -93,7 +97,7 @@ The `cmd` argument supports expansion of repository depending strings :
 
 ### Section `status_commands`
 
-Can contain a list of repository commands/tools for each status 
+Can contain a list of repository commands/tools for each status
 that will be shown when opening context menu within the status tab
 of currently selected repository-detail area.
 
