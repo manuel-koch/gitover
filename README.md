@@ -37,14 +37,31 @@ git interactions :
 GitOver uses a configuration file that can be placed in your home directory
 or in a directory hierarchy that includes your git repositories.
 
-The configuration file should be named `.gitover` and contains YAML formatted
-entries.
+E.g. if your repository is located at `~/workspace/gitover` then GitOver will search
+`.gitover` in the following directories, first match is used :
 
-For example :
+- ~/workspace/gitover
+- ~/workspace
+- ~
+- asf.
+
+The configuration file should be named `.gitover` and contains YAML formatted
+entries, for example
 
 ```
 general:
+    # where to find `git` executable
     git: /usr/local/bin/git
+    # # optional (default = "fswatch"), where to find `fswatch` executable.
+    # fswatch: /usr/local/bin/fswatch
+    # # optional (default = "true"), whether to use just one instance of fswatch to watch all repositories
+    # # or use one instance of fswatch per repository.
+    # fswatch-singleton: "true"
+    # # optional (default = <NOF_CORES> * 2)
+    # task-concurrency: 8
+    # # optional (default = ""), write logging to given path
+    # debug-log: ~/tmp/gitover.log
+
 repo_commands:
     - name:  "finder"
       title: "Finder"
@@ -63,6 +80,23 @@ status_commands:
     - name:  "mergetool_bc"
       title: "Merge (bc)"
       cmd:   "git mergetool --tool=beyondcompare -y '{path}'"
+  modified:
+    - name:    "atom"
+      title:   "Edit with Atom"
+      cmd:     "/usr/local/bin/atom '{path}'"
+    - name:    "subl"
+      title:   "Edit with Sublime"
+      cmd:     "/Users/manuelkoch/bin/subl '{path}'"
+    - name:    "backup"
+      title:   "Backup to *.modified"
+      cmd:     "mv '{path}' '{path}'.modified"
+  untracked:
+    - name:    "atom"
+      title:   "Edit with Atom"
+      cmd:     "/usr/local/bin/atom '{path}'"
+    - name:    "subl"
+      title:   "Edit with Sublime"
+      cmd:     "/Users/manuelkoch/bin/subl '{path}'"
 ```
 
 ### Section `general`
@@ -120,7 +154,8 @@ the trunk branch.
 
 Double clicking the GitOver app doesn't start it - instead it crashes silently.
 It may still run when starting it explicitly on console.
-Cause may be misconfigured or not yet installed XCode stuff after Mac OSX upgrade ( i.e. to High Sierra ).
+Cause may be misconfigured or not yet installed XCode stuff after
+Mac OSX upgrade ( i.e. to High Sierra ).
 You may need to reinstall XCode stuff to get git working again, [see][6].
 
 ## Build / bundle prerequisites
