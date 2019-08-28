@@ -15,10 +15,11 @@
 //
 // Copyright 2017 Manuel Koch
 //
-import QtQuick 2.6
+import QtQuick 2.13
 import QtQuick.Layouts 1.2
 import QtQuick.Controls 1.4
-import QtQuick.Controls.Styles 1.4
+import QtQuick.Controls 2.5 as Ctrl
+import QtQuick.Controls.Styles 1.2
 import Gitover 1.0
 
 Item {
@@ -37,6 +38,10 @@ Item {
     ComboBox {
         id: theCombo
         anchors.fill: parent
+
+        Ctrl.ToolTip.visible: !pressed && hovered
+        Ctrl.ToolTip.text: repository ? repository.branch : ""
+        Ctrl.ToolTip.delay: Qt.styleHints.mousePressAndHoldInterval
 
         style: ComboBoxStyle {
             font: root.font
