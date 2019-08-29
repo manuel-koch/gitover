@@ -18,8 +18,10 @@ LATEST_VERSION=$(git tag | grep -e "^v" | sort | tail -1 | cut -b2-)
 HEAD_VERSION=$(git tag --points-at HEAD | grep -e "^v" | sort | tail -1 | cut -b2-)
 VERSION_POSTFIX=""
 [[ "$LATEST_VERSION" != "$HEAD_VERSION" ]] && VERSION_POSTFIX="-$HEAD_COMMIT"
+BUILD_TIME=$(date -u "+%Y-%m-%dT%H:%M:%SZ")
 echo "gitover_commit_sha = '$HEAD_COMMIT'" >> "$RESOURCE_OUT"
 echo "gitover_version = '${LATEST_VERSION}${VERSION_POSTFIX}'" >> "$RESOURCE_OUT"
+echo "gitover_build_time = '${BUILD_TIME}'" >> "$RESOURCE_OUT"
 echo "Using version info ${LATEST_VERSION}${VERSION_POSTFIX}"
 
 ICON_IN=${BASE_DIR}/icon.png

@@ -31,7 +31,7 @@ from PyQt5.QtGui import QGuiApplication, QIcon
 from PyQt5.QtQml import QQmlApplicationEngine
 from PyQt5.QtQuick import QQuickView
 
-from gitover.ui.resources import gitover_commit_sha, gitover_version
+from gitover.ui.resources import gitover_commit_sha, gitover_version, gitover_build_time
 from gitover.repos_model import ReposModel, Repo, ChangedFilesModel, OutputModel, CommitDetails
 from gitover.formatter import GitDiffFormatter
 from gitover.res_helper import getResourceUrl
@@ -109,6 +109,7 @@ def run_gui(repo_paths, watch_filesystem, nof_bg_threads):
     engine.setOutputWarningsToStandardError(True)
     engine.rootContext().setContextProperty("globalVersion", gitover_version)
     engine.rootContext().setContextProperty("globalCommitSha", gitover_commit_sha)
+    engine.rootContext().setContextProperty("globalBuildTime", gitover_build_time)
     engine.rootContext().setContextProperty("globalRepositories", repos)
     engine.load(getResourceUrl("qml/Main.qml"))
 
