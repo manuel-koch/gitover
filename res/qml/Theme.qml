@@ -44,6 +44,7 @@ Item {
         property color statusSectionBg:       "#ACDBDD"
         property color branchAhead:           "#57C857"
         property color branchBehind:          "#432182"
+        property color warningMsgBg:          "#FAE86D"
 
         property color badgeText:     "white"
         property color badgeError:    "#BF2121"

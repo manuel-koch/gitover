@@ -42,7 +42,7 @@ Item {
         MessageDialog {
             id: theAboutDialog
             title: "About"
-            text: "<i>Gitover</i> " + globalVersion +
+            text: "<i>Gitover</i> " + globalVersion + (globalVersionCanUpdate ? " ==> latest released version is " + globalLatestVersion : "") +
                   "<br>Built from git commit " + globalCommitSha +
                   "<br>Built at " + globalBuildTime
             onAccepted: root.closeDialog()

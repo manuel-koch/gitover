@@ -98,8 +98,32 @@ ApplicationWindow {
         property bool hasRepos: globalRepositories.nofRepos != 0
     }
 
+    Rectangle {
+        id: theUpdateBg
+        visible:        globalVersionCanUpdate || globalVersionExperimental
+        anchors.top:    parent.top
+        anchors.left:   parent.left
+        anchors.right:  parent.right
+        height:         visible ? theUpdateText.implicitHeight + 4 : 0
+        color:          Theme.colors.warningMsgBg
+        Text {
+            id: theUpdateText
+            anchors.centerIn:     parent
+            width:                parent.width
+
+            horizontalAlignment:  Text.AlignHCenter
+            verticalAlignment:    Text.AlignVCenter
+            textFormat:           Text.RichText
+            text:                 "You are using <i>Gitover</i> " + globalVersion + ", latest released version is <a href='update'>" + globalLatestVersion + "</a>."
+            onLinkActivated:      { console.info(globalLatestVersionUrl); Qt.openUrlExternally(globalLatestVersionUrl) }
+        }
+    }
+
     SplitView {
-        anchors.fill:    parent
+        anchors.top:     theUpdateBg.bottom
+        anchors.left:    parent.left
+        anchors.right:   parent.right
+        anchors.bottom:  parent.bottom
         anchors.margins: 2
         orientation:     Qt.Vertical
 
@@ -364,9 +388,9 @@ ApplicationWindow {
     }
 
     Text {
-        anchors.centerIn:    parent
-        text:                "Display overview(s) by <a href='open'>opening</a> a git repository..."
-        onLinkActivated:     theAddRepoDialog.openDialog()
-        visible:             !internal.hasRepos
+        anchors.centerIn: parent
+        text:             "Display overviews by <a href='open'>opening</a> a git repository..."
+        visible:          !internal.hasRepos
+        onLinkActivated:  theAddRepoDialog.openDialog()
     }
 }

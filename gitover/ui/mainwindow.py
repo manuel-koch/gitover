@@ -36,6 +36,7 @@ from gitover.repos_model import ReposModel, Repo, ChangedFilesModel, OutputModel
 from gitover.formatter import GitDiffFormatter
 from gitover.res_helper import getResourceUrl
 from gitover.wakeup import WakeupWatcher
+from gitover.updater import get_latest_version, is_version_greater
 
 LOGGER = logging.getLogger(__name__)
 
@@ -76,9 +77,9 @@ def run_gui(repo_paths, watch_filesystem, nof_bg_threads):
     app.setOrganizationDomain("mko.com")
     app.setApplicationName("GitOver")
     app.setApplicationVersion("{}".format(gitover_version))
-    app.setWindowIcon(QIcon(':/icon.png'))
+    app.setWindowIcon(QIcon(":/icon.png"))
 
-    QThread.currentThread().setObjectName('mainThread')
+    QThread.currentThread().setObjectName("mainThread")
     QThreadPool.globalInstance().setMaxThreadCount(nof_bg_threads)
 
     wakeupWatcher = WakeupWatcher()
@@ -105,9 +106,19 @@ def run_gui(repo_paths, watch_filesystem, nof_bg_threads):
     repos = ReposModel(watch_filesystem=watch_filesystem)
     [repos.addRepoByPath(path, defer=True) for path in repo_paths]
 
+    latest_version, latest_version_url = get_latest_version()
+
     engine = QQmlApplicationEngine(app)
     engine.setOutputWarningsToStandardError(True)
     engine.rootContext().setContextProperty("globalVersion", gitover_version)
+    engine.rootContext().setContextProperty(
+        "globalVersionCanUpdate", is_version_greater(latest_version, gitover_version)
+    )
+    engine.rootContext().setContextProperty(
+        "globalVersionExperimental", is_version_greater(gitover_version, latest_version)
+    )
+    engine.rootContext().setContextProperty("globalLatestVersion", latest_version)
+    engine.rootContext().setContextProperty("globalLatestVersionUrl", latest_version_url)
     engine.rootContext().setContextProperty("globalCommitSha", gitover_commit_sha)
     engine.rootContext().setContextProperty("globalBuildTime", gitover_build_time)
     engine.rootContext().setContextProperty("globalRepositories", repos)
