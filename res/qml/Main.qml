@@ -33,6 +33,12 @@ ApplicationWindow {
         Menu {
             title: "File"
             MenuItem {
+                text:        "\&New Window"
+                shortcut:    "Ctrl+N"
+                onTriggered: globalLauncher.openNewWindow("")
+            }
+
+            MenuItem {
                 text:        "\&Open repository"
                 shortcut:    "Ctrl+O"
                 onTriggered: theAddRepoDialog.openDialog()

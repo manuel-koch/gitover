@@ -22,9 +22,10 @@ Copyright 2017 Manuel Koch
 Main window of git overview.
 """
 import logging
+from collections import namedtuple
 
 from PyQt5 import QtCore
-from PyQt5.QtCore import Qt, qInstallMessageHandler, QThreadPool
+from PyQt5.QtCore import Qt, qInstallMessageHandler, QThreadPool, pyqtSlot, QObject
 from PyQt5.QtCore import QThread
 from PyQt5.QtCore import QSettings
 from PyQt5.QtGui import QGuiApplication, QIcon
@@ -37,6 +38,7 @@ from gitover.formatter import GitDiffFormatter
 from gitover.res_helper import getResourceUrl
 from gitover.wakeup import WakeupWatcher
 from gitover.updater import get_latest_version, is_version_greater
+from gitover.launcher import Launcher
 
 LOGGER = logging.getLogger(__name__)
 
@@ -61,10 +63,82 @@ def position_window(wnd, x, y):
 
 
 def reposition_window(wnd):
+    LOGGER.info(f"Repositioning {wnd}")
     x = wnd.x()
     y = wnd.y()
     position_window(wnd, x + 1, y + 1)
     position_window(wnd, x, y)
+
+
+WindowContext = namedtuple("WindowContext", ("engine", "window", "repos"))
+
+
+class Windows(QObject):
+    def __init__(self, app, parent=None):
+        super().__init__(parent)
+        self._app = app
+        self._contexts = []
+
+    def create(self, watch_filesystem=True, paths=None, context=None):
+        paths = paths or []
+        context = (context or {}).copy()
+
+        repos = ReposModel(watch_filesystem=watch_filesystem)
+        [repos.addRepoByPath(path, defer=True) for path in paths]
+
+        engine = QQmlApplicationEngine(self._app)
+        engine.setOutputWarningsToStandardError(True)
+
+        context["globalRepositories"] = repos
+        for k, v in context.items():
+            if k.startswith("global"):
+                engine.rootContext().setContextProperty(k, v)
+
+        engine.load(getResourceUrl("qml/Main.qml"))
+
+        settings = QSettings()
+        settings.beginGroup("MainWindow")
+        x = settings.value("x")
+        y = settings.value("y")
+        w = settings.value("width", 300)
+        h = settings.value("height", 600)
+        settings.endGroup()
+
+        wnd = engine.rootObjects()[0]
+        wnd.title = self._app.applicationName()
+        wnd.setProperty("title", self._app.applicationName())
+        wnd.setProperty("width", w)
+        wnd.setProperty("height", h)
+        position_window(wnd, x, y)
+        wnd.closing.connect(self._onClose)
+
+        self._contexts.append(WindowContext(engine, wnd, repos))
+
+    def _onClose(self, closeEvt):
+        wnd = self.sender()
+        if len(self._contexts) == 1:
+            settings = QSettings()
+            settings.beginGroup("MainWindow")
+            settings.setValue("x", wnd.x())
+            settings.setValue("y", wnd.y())
+            settings.setValue("width", wnd.width())
+            settings.setValue("height", wnd.height())
+            settings.endGroup()
+        for idx in range(len(self._contexts)):
+            if self._contexts[idx].window == wnd:
+                self._cleanup_context(self._contexts.pop(idx))
+                return
+
+    def cleanup(self):
+        while self._contexts:
+            self._cleanup_context(self._contexts.pop(-1))
+
+    def _cleanup_context(self, context):
+        context.repos.cleanup()
+
+    def reposition_windows(self):
+        for idx in self._contexts:
+            reposition_window(self._contexts[idx].window)
 
 
 def run_gui(repo_paths, watch_filesystem, nof_bg_threads):
@@ -82,12 +156,11 @@ def run_gui(repo_paths, watch_filesystem, nof_bg_threads):
     QThread.currentThread().setObjectName("mainThread")
     QThreadPool.globalInstance().setMaxThreadCount(nof_bg_threads)
 
-    wakeupWatcher = WakeupWatcher()
-
     LOGGER.info("{} ({})".format(app.applicationName(), app.applicationVersion()))
 
     qInstallMessageHandler(messageHandler)
 
+    Launcher.registerToQml()
     ReposModel.registerToQml()
     Repo.registerToQml()
     ChangedFilesModel.registerToQml()
@@ -95,62 +168,38 @@ def run_gui(repo_paths, watch_filesystem, nof_bg_threads):
     GitDiffFormatter.registerToQml()
     CommitDetails.registerToQml()
 
-    settings = QSettings()
-    settings.beginGroup("MainWindow")
-    x = settings.value("x")
-    y = settings.value("y")
-    w = settings.value("width", 300)
-    h = settings.value("height", 600)
-    settings.endGroup()
-
-    repos = ReposModel(watch_filesystem=watch_filesystem)
-    [repos.addRepoByPath(path, defer=True) for path in repo_paths]
-
     latest_version, latest_version_url = get_latest_version()
 
-    engine = QQmlApplicationEngine(app)
-    engine.setOutputWarningsToStandardError(True)
-    engine.rootContext().setContextProperty("globalVersion", gitover_version)
-    engine.rootContext().setContextProperty(
-        "globalVersionCanUpdate", is_version_greater(latest_version, gitover_version)
+    windows = Windows(app)
+    wakeupWatcher = WakeupWatcher()
+    launcher = Launcher()
+    context = dict(
+        globalLauncher=launcher,
+        globalVersion=gitover_version,
+        globalVersionCanUpdate=is_version_greater(latest_version, gitover_version),
+        globalVersionExperimental=is_version_greater(gitover_version, latest_version),
+        globalLatestVersion=latest_version,
+        globalLatestVersionUrl=latest_version_url,
+        globalCommitSha=gitover_commit_sha,
+        globalBuildTime=gitover_build_time,
     )
-    engine.rootContext().setContextProperty(
-        "globalVersionExperimental", is_version_greater(gitover_version, latest_version)
+    launcher.openNewWindow[str].connect(
+        lambda paths: windows.create(
+            watch_filesystem=watch_filesystem, paths=paths, context=context
+        )
     )
-    engine.rootContext().setContextProperty("globalLatestVersion", latest_version)
-    engine.rootContext().setContextProperty("globalLatestVersionUrl", latest_version_url)
-    engine.rootContext().setContextProperty("globalCommitSha", gitover_commit_sha)
-    engine.rootContext().setContextProperty("globalBuildTime", gitover_build_time)
-    engine.rootContext().setContextProperty("globalRepositories", repos)
-    engine.load(getResourceUrl("qml/Main.qml"))
 
-    wnd = engine.rootObjects()[0]
-    wnd.title = app.applicationName()
-    wnd.setProperty("title", app.applicationName())
-    wnd.setProperty("width", w)
-    wnd.setProperty("height", h)
-    position_window(wnd, x, y)
+    windows.create(app, paths=repo_paths, context=context)
 
     # workaround context menus at wrong position after wakeup from sleeping !?
-    wakeupWatcher.awake.connect(lambda: reposition_window(wnd))
+    wakeupWatcher.awake.connect(lambda: windows.reposition_windows)
 
     # Run the application
     result = app.exec_()
 
-    settings = QSettings()
-    settings.beginGroup("MainWindow")
-    settings.setValue("x", wnd.x())
-    settings.setValue("y", wnd.y())
-    settings.setValue("width", wnd.width())
-    settings.setValue("height", wnd.height())
-    settings.endGroup()
-    settings = None
-
-    repos.cleanup()
-    wnd = None
-    engine = None
-    repos = None
+    windows.cleanup()
     wakeupWatcher = None
+    launcher = None
     app = None
 
     LOGGER.info("Done.")
