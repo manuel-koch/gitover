@@ -10,8 +10,10 @@ res/build_resources.sh
 #echo QT5DIR=${QT5DIR}
 
 THIS_DIR=$(dirname $0)
-BUNDLE_CONTENTS_DIR=${THIS_DIR}/dist/GitOver.app/Contents
+BUNDLE_DIR=${THIS_DIR}/dist/GitOver.app
+BUNDLE_CONTENTS_DIR=${BUNDLE_DIR}/Contents
 BUNDLE_MACOS_DIR=${BUNDLE_CONTENTS_DIR}/MacOS
+SIGNING_CERT="GitOverSigning"
 
 # When using pyenv virtualenv the Python interpreter must be build with shared option enabled.
 # $ env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install 3.6.4
@@ -19,7 +21,13 @@ BUNDLE_MACOS_DIR=${BUNDLE_CONTENTS_DIR}/MacOS
 #
 # Extended debug while building/running application:
 # --log-level=DEBUG --debug
-pyinstaller --icon ${THIS_DIR}/res/icon.icns --onefile --windowed --noconfirm --clean --hidden-import PyQt5.sip -n GitOver --paths ${THIS_DIR} ${THIS_DIR}/gitover/main.py
+pyinstaller --icon ${THIS_DIR}/res/icon.icns \
+    --onefile --windowed --noconfirm --clean \
+    --hidden-import PyQt5.sip \
+    --osx-bundle-identifier de.manuelkoch.gitover \
+    -n GitOver \
+    --paths ${THIS_DIR} \
+    ${THIS_DIR}/gitover/main.py
 
 # Add support for high DPI aka retina displays
 INFO_PLIST=${BUNDLE_CONTENTS_DIR}/Info.plist
@@ -30,3 +38,11 @@ plutil -insert NSHighResolutionCapable -string True ${INFO_PLIST}
 cp ${THIS_DIR}/COPYING ${BUNDLE_MACOS_DIR}
 cp ${THIS_DIR}/LICENSE ${BUNDLE_MACOS_DIR}
 cp ${THIS_DIR}/README.md ${BUNDLE_MACOS_DIR}
+
+# Code Signing
+# see https://github.com/pyinstaller/pyinstaller/wiki/Recipe-OSX-Code-Signing
+# and https://github.com/pyinstaller/pyinstaller/wiki/Recipe-OSX-Code-Signing-Qt
+${THIS_DIR}/res/fix_app_qt_folder_names_for_codesign.py ${BUNDLE_DIR}
+security find-certificate -c "${SIGNING_CERT}" >/dev/null \
+    && codesign --deep -s "${SIGNING_CERT}" ${BUNDLE_DIR} \
+    && codesign -dv --verbose=4 ${BUNDLE_DIR}
