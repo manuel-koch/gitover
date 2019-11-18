@@ -10,9 +10,14 @@ res/build_resources.sh
 #echo QT5DIR=${QT5DIR}
 
 THIS_DIR=$(dirname $0)
-BUNDLE_DIR=${THIS_DIR}/dist/GitOver.app
+BUNDLE_NAME=GitOver
+DIST_DIR=${THIS_DIR}/dist
+BUNDLE_DIR=${DIST_DIR}/${BUNDLE_NAME}.app
 BUNDLE_CONTENTS_DIR=${BUNDLE_DIR}/Contents
 BUNDLE_MACOS_DIR=${BUNDLE_CONTENTS_DIR}/MacOS
+BUNDLE_ICON=${THIS_DIR}/res/icon.icns
+BUNDLE_VERSION=$(grep "gitover_version =" ${THIS_DIR}/gitover/ui/resources.py | cut -d "=" -f 2 | tr -d " '")
+BUNDLE_DMG_NAME=${BUNDLE_NAME}_${BUNDLE_VERSION}
 SIGNING_CERT="GitOverSigning"
 
 # When using pyenv virtualenv the Python interpreter must be build with shared option enabled.
@@ -21,11 +26,11 @@ SIGNING_CERT="GitOverSigning"
 #
 # Extended debug while building/running application:
 # --log-level=DEBUG --debug
-pyinstaller --icon ${THIS_DIR}/res/icon.icns \
+pyinstaller --icon ${BUNDLE_ICON} \
     --onefile --windowed --noconfirm --clean \
     --hidden-import PyQt5.sip \
     --osx-bundle-identifier de.manuelkoch.gitover \
-    -n GitOver \
+    -n ${BUNDLE_NAME} \
     --paths ${THIS_DIR} \
     ${THIS_DIR}/gitover/main.py
 
@@ -46,3 +51,15 @@ ${THIS_DIR}/res/fix_app_qt_folder_names_for_codesign.py ${BUNDLE_DIR}
 security find-certificate -c "${SIGNING_CERT}" >/dev/null \
     && codesign --deep -s "${SIGNING_CERT}" ${BUNDLE_DIR} \
     && codesign -dv --verbose=4 ${BUNDLE_DIR}
+
+# DMG
+test -f ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg && rm -f ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg
+create-dmg --volname ${BUNDLE_NAME} --volicon ${BUNDLE_ICON} \
+           --icon "${BUNDLE_NAME}.app" 110 150 \
+           --app-drop-link 380 150 \
+           --background res/dmg_bg.png \
+           ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg \
+           ${BUNDLE_DIR}
+pushd ${DIST_DIR}
+shasum -a 256 ${BUNDLE_DMG_NAME}.dmg > ${BUNDLE_DMG_NAME}.sha256
+popd

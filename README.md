@@ -27,6 +27,7 @@ git interactions :
 * [GitPython][3], to display repository info and trigger git actions
 * [PyInstaller][4], to bundle an easy to distribute application bundle
 * [fswatch][5], to track changes in filesystem
+* [create-dmg][7], to create nice DMG for bundled app
 
 ## Screenshots
 
@@ -169,3 +170,4 @@ You may need to reinstall XCode stuff to get git working again, [see][6].
 [4]: http://www.pyinstaller.org/ "PyInstaller"
 [5]: https://github.com/emcrisostomo/fswatch "fswatch"
 [6]: http://www.linuxuk.org/post/fixing_git_on_macOS_Sierra/
+[7]: https://github.com/andreyvit/create-dmg "create-dmg"
