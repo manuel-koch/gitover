@@ -38,6 +38,7 @@ pyinstaller --icon ${BUNDLE_ICON} \
 INFO_PLIST=${BUNDLE_CONTENTS_DIR}/Info.plist
 plutil -insert NSPrincipalClass -string NSApplication ${INFO_PLIST}
 plutil -insert NSHighResolutionCapable -string True ${INFO_PLIST}
+plutil -replace CFBundleShortVersionString -string ${BUNDLE_VERSION} ${INFO_PLIST}
 
 # Add various info texts too
 cp ${THIS_DIR}/COPYING ${BUNDLE_MACOS_DIR}
