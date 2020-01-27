@@ -26,26 +26,36 @@ SIGNING_CERT="GitOverSigning"
 #
 # Extended debug while building/running application:
 # --log-level=DEBUG --debug
+echo ================================================================
+echo == Building app bundle
+echo ================================================================
 pyinstaller --icon ${BUNDLE_ICON} \
     --onefile --windowed --noconfirm --clean \
     --hidden-import PyQt5.sip \
     --osx-bundle-identifier de.manuelkoch.gitover \
     -n ${BUNDLE_NAME} \
     --paths ${THIS_DIR} \
-    ${THIS_DIR}/gitover/main.py
+    ${THIS_DIR}/gitover/main.py || exit 1
 
+echo ================================================================
+echo == Updating app bundle properties
+echo ================================================================
 # Add support for high DPI aka retina displays
 INFO_PLIST=${BUNDLE_CONTENTS_DIR}/Info.plist
 plutil -insert NSPrincipalClass -string NSApplication ${INFO_PLIST}
 plutil -insert NSHighResolutionCapable -string True ${INFO_PLIST}
 plutil -replace CFBundleShortVersionString -string ${BUNDLE_VERSION} ${INFO_PLIST}
 
-# Add various info texts too
+echo ================================================================
+echo == Adding other files to app bundle
+echo ================================================================
 cp ${THIS_DIR}/COPYING ${BUNDLE_MACOS_DIR}
 cp ${THIS_DIR}/LICENSE ${BUNDLE_MACOS_DIR}
 cp ${THIS_DIR}/README.md ${BUNDLE_MACOS_DIR}
 
-# Code Signing
+echo ================================================================
+echo == Code signing app bundle
+echo ================================================================
 # see https://github.com/pyinstaller/pyinstaller/wiki/Recipe-OSX-Code-Signing
 # and https://github.com/pyinstaller/pyinstaller/wiki/Recipe-OSX-Code-Signing-Qt
 ${THIS_DIR}/res/fix_app_qt_folder_names_for_codesign.py ${BUNDLE_DIR}
@@ -53,7 +63,9 @@ security find-certificate -c "${SIGNING_CERT}" >/dev/null \
     && codesign --deep -s "${SIGNING_CERT}" ${BUNDLE_DIR} \
     && codesign -dv --verbose=4 ${BUNDLE_DIR}
 
-# DMG
+echo ================================================================
+echo == Build DMG of app bundle
+echo ================================================================
 test -f ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg && rm -f ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg
 create-dmg --volname ${BUNDLE_NAME} --volicon ${BUNDLE_ICON} \
            --icon "${BUNDLE_NAME}.app" 110 150 \
@@ -61,6 +73,10 @@ create-dmg --volname ${BUNDLE_NAME} --volicon ${BUNDLE_ICON} \
            --background res/dmg_bg.png \
            ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg \
            ${BUNDLE_DIR}
-pushd ${DIST_DIR}
+
+echo ================================================================
+echo == Build checksum of DMG
+echo ================================================================
+pushd ${DIST_DIR} >/dev/null
 shasum -a 256 ${BUNDLE_DMG_NAME}.dmg > ${BUNDLE_DMG_NAME}.sha256
-popd
+popd >/dev/null

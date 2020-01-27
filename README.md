@@ -155,8 +155,8 @@ the trunk branch.
 
 Double clicking the GitOver app doesn't start it - instead it crashes silently.
 It may still run when starting it explicitly on console.
-Cause may be misconfigured or not yet installed XCode stuff after
-Mac OSX upgrade ( i.e. to High Sierra ).
+Cause may be misconfiguration or not yet installed XCode stuff after
+Mac OSX upgrade ( i.e. to Catalina ).
 You may need to reinstall XCode stuff to get git working again, [see][6].
 
 ## Build / bundle prerequisites

@@ -6,10 +6,14 @@ bundle::
 compile_deps::
 	${PIP_COMPILE} requirements.in
 
+list_outdated_deps::
+	pip list --outdated
+
 upgrade_deps::
 	${PIP_COMPILE} --upgrade requirements.in
 
 install_deps::
+	pip install --upgrade pip pip-tools wheel
 	pip-sync requirements.txt
 
 build_resources::
