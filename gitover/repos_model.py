@@ -19,7 +19,7 @@ Copyright 2017 Manuel Koch
 
 ----------------------------
 
-Data model for all repositiories.
+Data model for all repositories.
 """
 import webbrowser
 from collections import OrderedDict, defaultdict
@@ -936,6 +936,18 @@ class GitRebaseWorker(QObject):
             os.path.join(self._repo.git_dir, "rebase-merge", "done"),
             os.path.join(self._repo.git_dir, "rebase-apply", "rebasing"),
         ]
+
+        cfg = self._config()
+        editor = cfg.general().get("git-editor")
+        if editor:
+            # Using `set_persistent_git_options` only works as long as we only want to set
+            # _one_ config option using `c` !
+            self._repo.git.set_persistent_git_options(c=f"core.editor={editor}")
+
+    def _config(self):
+        cfg = Config()
+        cfg.load(self._path)
+        return cfg
 
     def checkRebasing(self):
         self._workerSlot.schedule(self._onCheckRebasing)
