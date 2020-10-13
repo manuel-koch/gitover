@@ -218,11 +218,11 @@ ApplicationWindow {
                     }
                 }
 
-                // sort by ascending area
-                dims.sort(function(a,b) { return (b.width*b.height) - (a.width*a.height) })
+                // sort by ascending width
+                dims.sort(function(a,b) { return b.width - a.width })
 
                 if( dims.length ) {
-                    // pick the layout with the greatest area per cell
+                    // pick the layout with the greatest width per cell
                     theRepoGrid.cellsPerRow = dims[0].cols
                 }
             }
