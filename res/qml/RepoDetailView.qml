@@ -77,7 +77,7 @@ Rectangle {
                     property bool obsolete: root.repository !== null && repository.mergedToTrunkBranches.indexOf(modelData) != -1
                     width:           parent.width
                     text:            modelData
-                    label:           (obsolete ? "--> <i>(obsolete: already merged to trunk)</i> --> <a href='delete'>delete</a>" : "")
+                    label:           (obsolete ? "--> <i>(obsolete: already merged to trunk)</i> " : "") + (!current ? "--> <a href='delete'>delete</a>" : "")
                     font.pointSize:  Theme.fonts.smallPointSize
                     font.bold:       current
                     leftPadding:     10
