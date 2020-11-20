@@ -48,7 +48,7 @@ ApplicationWindow {
                 id: recentReposMenu
                 title: "Open recent repository..."
                 Instantiator {
-                    model: globalRepositories.recentRepos
+                    model: globalRepositories ? globalRepositories.recentRepos : null
                     MenuItem {
                         text: index < globalRepositories.recentRepos.length && globalRepositories.recentRepos[index] ? globalRepositories.recentRepos[index].title + " ( " + globalRepositories.recentRepos[index].subtitle + " )" : ""
                         onTriggered: globalRepositories.addRepoByPath(globalRepositories.recentRepos[index].path)
@@ -101,7 +101,7 @@ ApplicationWindow {
 
     QtObject {
         id: internal
-        property bool hasRepos: globalRepositories.nofRepos != 0
+        property bool hasRepos: globalRepositories && globalRepositories.nofRepos != 0
     }
 
     Rectangle {
