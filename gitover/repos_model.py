@@ -259,7 +259,7 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         LOGGER.info("Searching sub repos of {}".format(rootpath))
         subpaths = list(filter(self._isRepo, [r.abspath for r in git.Repo(rootpath).submodules]))
         for subpath in subpaths:
-            name = subpath[len(rootpath) + 1 :]
+            name = subpath[len(rootpath) + 1:]
             self._queued_path += [(subpath, name)]
 
         if self._watchFs:
@@ -410,8 +410,8 @@ class GitStatus(object):
                 r.name
                 for r in repo.references
                 if isinstance(r, git.RemoteReference)
-                and r.name != (r.remote_name + "/HEAD")
-                and r.name not in trackedBranches
+                   and r.name != (r.remote_name + "/HEAD")
+                   and r.name not in trackedBranches
             ]
             availRemoteBranches.sort(key=str.lower)
             self.remoteBranches = availRemoteBranches
@@ -467,7 +467,7 @@ class GitStatus(object):
             for path in unmergedBlobs:
                 for (stage, dummyBlob) in unmergedBlobs[path]:
                     if (
-                        stage != 0
+                            stage != 0
                     ):  # anything else than zero indicates a conflict that must be resolved
                         self.conflicts.add(path)
         except:
@@ -1210,7 +1210,7 @@ class ChangedFilesModel(QAbstractItemModel, QmlTypeMixin):
         return None
 
     def setChanges(
-        self, modified=None, staged=None, deleted=None, conflicting=None, untracked=None
+            self, modified=None, staged=None, deleted=None, conflicting=None, untracked=None
     ):
         self.beginResetModel()
         entries = []
@@ -1754,7 +1754,7 @@ class Repo(QObject, QmlTypeMixin):
             cmds.append(dict(name="__rebaseabort", title="Abort rebase"))
         if branchValid:
             updatedTrackingBranch = (
-                self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits
+                    self._tracking_branch_behind_commits or self._tracking_branch_ahead_commits
             )
             if not self._tracking_branch or updatedTrackingBranch:
                 cmds.append(dict(name="__push", title="Push"))
