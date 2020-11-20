@@ -31,8 +31,12 @@ Item {
 
     Connections {
         target: repository
-        onBranchChanged:   theCombo.useBranches(repository.branch,repository.branches)
-        onBranchesChanged: theCombo.useBranches(repository.branch,repository.branches)
+        function onBranchChanged() {
+            theCombo.useBranches(repository.branch,repository.branches)
+        }
+        function onBranchesChanged() {
+            theCombo.useBranches(repository.branch,repository.branches)
+        }
     }
 
     ComboBox {

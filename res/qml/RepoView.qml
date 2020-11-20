@@ -41,11 +41,11 @@ Rectangle {
 
     Connections {
         target: repository
-        onError: {
+        function onError(msg) {
             theErrorBadge.text = msg
             theErrorBadge.visible = true
         }
-        onRemoteUrlChanged: {
+        function onRemoteUrlChanged(url) {
             theRemoteUrlBadge.text = "Goto remote..."
             theRemoteUrlBadge.visible = url != ""
         }

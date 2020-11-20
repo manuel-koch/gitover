@@ -40,7 +40,9 @@ Rectangle {
 
     Connections {
         target: repository
-        onStatusUpdated: theDiff.updateDiff()
+        function onStatusUpdated() {
+            theDiff.updateDiff()
+        }
     }
 
     TextArea {

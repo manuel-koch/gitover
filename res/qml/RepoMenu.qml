@@ -43,7 +43,9 @@ Menu {
 
     Connections {
         target: repository
-        onStatusUpdated: fillMenu()
+        function onStatusUpdated() {
+            fillMenu()
+        }
     }
 
     Instantiator {

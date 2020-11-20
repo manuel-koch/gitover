@@ -43,7 +43,7 @@ Rectangle {
 
     Connections {
         target: repository
-        onStatusUpdated: {
+        function onStatusUpdated() {
             theMenu.close()
             theList.selectEntry(theList.currentIndex)
         }
