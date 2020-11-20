@@ -30,6 +30,7 @@ Item {
     property alias label:       theLabel.text
     property alias font:        theText.font
     property alias leftPadding: theText.leftPadding
+    property alias wrapMode:    theText.wrapMode
 
     signal linkActivated(string link)
 
@@ -41,6 +42,7 @@ Item {
             id: theText
             Layout.fillWidth:      true
             Layout.maximumWidth:   implicitWidth
+            Layout.minimumHeight:  implicitHeight
             readOnly:              true
             selectByMouse:         true
             clip:                  true

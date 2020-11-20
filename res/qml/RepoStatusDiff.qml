@@ -33,10 +33,12 @@ Rectangle {
     property Repo repository: null
     property string path: ""
     property string status: ""
+    property string commit: ""
 
     onRepositoryChanged: theDiff.updateDiff()
     onPathChanged:       theDiff.updateDiff()
     onStatusChanged:     theDiff.updateDiff()
+    onCommitChanged:     theDiff.updateDiff()
 
     Connections {
         target: repository
@@ -62,11 +64,11 @@ Rectangle {
         }
 
         function updateDiff() {
-            text = (root.repository !== null ? root.repository.diff(path,status,1024*512) : "")
+            text = (root.repository !== null ? root.repository.diff(commit || path,status,1024*512) : "")
         }
     }
 
     GitDiffFormatter {
-        textDocument: (status=="modified" || status=="staged" || status=="conflict") ? theDiff.textDocument : null
+        textDocument: (status=="committed" || status=="modified" || status=="staged" || status=="conflict") ? theDiff.textDocument : null
     }
 }

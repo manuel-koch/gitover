@@ -8,7 +8,8 @@ git interactions :
 * Show current branch's tracking/remote branch and ahead/behind counters
 * Show current branch's trunk branch and ahead/behind counters
 * Show remote branches
-* Show status info for modified, staged, untracked, deleted or conflicting files
+* Show status info for modified, staged, untracked, deleted or conflicting files  on current branch
+* Show history and change diffs on current branch
 * Checkout to another local branch by selecting a local branch from dropdown list
 * Basic git functions like
     * status

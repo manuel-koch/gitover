@@ -261,11 +261,26 @@ ApplicationWindow {
                         font.bold:      true
                         font.pointSize: 14
                     }
-                    RepoCommitList {
+                    RowLayout {
                         Layout.fillWidth:  true
                         Layout.fillHeight: true
-                        repository:       theRepoGrid.repository
-                        visible:          theRepoGrid.repository != null
+                        spacing:           2
+                        RepoCommitList {
+                            id: theCommitList
+                            Layout.fillWidth:  true
+                            Layout.fillHeight: true
+                            repository:       theRepoGrid.repository
+                            visible:          theRepoGrid.repository != null
+                        }
+                        RepoStatusDiff {
+                            id: theStatusDiff
+                            Layout.minimumWidth: parent.width/2
+                            Layout.fillHeight:   true
+                            repository:          theRepoGrid.repository
+                            commit:              theCommitList.selectedCommit
+                            status:              "committed"
+                            visible:             theRepoGrid.repository != null
+                        }
                     }
                 }
             }
@@ -308,12 +323,27 @@ ApplicationWindow {
                                 font.pointSize: 14
                                 visible:        theRepoGrid.repository != null
                             }
-                            RepoCommitList {
+                            RowLayout {
                                 Layout.fillWidth:  true
                                 Layout.fillHeight: true
-                                repository:       theRepoGrid.repository
-                                commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trunkBranchAheadCommits : null
-                                visible:          theRepoGrid.repository != null
+                                spacing:           2
+                                RepoCommitList {
+                                    id: theTrunkAheadCommitList
+                                    Layout.fillWidth:  true
+                                    Layout.fillHeight: true
+                                    repository:       theRepoGrid.repository
+                                    commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trunkBranchAheadCommits : null
+                                    visible:          theRepoGrid.repository != null
+                                }
+                                RepoStatusDiff {
+                                    id: theTrunkAheadStatusDiff
+                                    Layout.minimumWidth: parent.width/2
+                                    Layout.fillHeight:   true
+                                    repository:          theRepoGrid.repository
+                                    commit:              theTrunkAheadCommitList.selectedCommit
+                                    status:              "committed"
+                                    visible:             theRepoGrid.repository != null
+                                }
                             }
                         }
                     }
@@ -329,12 +359,27 @@ ApplicationWindow {
                                 font.pointSize: 14
                                 visible:        theRepoGrid.repository != null
                             }
-                            RepoCommitList {
+                            RowLayout {
                                 Layout.fillWidth:  true
                                 Layout.fillHeight: true
-                                repository:       theRepoGrid.repository
-                                commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trunkBranchBehindCommits : null
-                                visible:          theRepoGrid.repository != null
+                                spacing:           2
+                                RepoCommitList {
+                                    id: theTrunkBehindCommitList
+                                    Layout.fillWidth:  true
+                                    Layout.fillHeight: true
+                                    repository:       theRepoGrid.repository
+                                    commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trunkBranchBehindCommits : null
+                                    visible:          theRepoGrid.repository != null
+                                }
+                                RepoStatusDiff {
+                                    id: theTrunkBehindStatusDiff
+                                    Layout.minimumWidth: parent.width/2
+                                    Layout.fillHeight:   true
+                                    repository:          theRepoGrid.repository
+                                    commit:              theTrunkBehindCommitList.selectedCommit
+                                    status:              "committed"
+                                    visible:             theRepoGrid.repository != null
+                                }
                             }
                         }
                     }
@@ -350,12 +395,27 @@ ApplicationWindow {
                                 font.pointSize: 14
                                 visible:        theRepoGrid.repository != null
                             }
-                            RepoCommitList {
+                            RowLayout {
                                 Layout.fillWidth:  true
                                 Layout.fillHeight: true
-                                repository:       theRepoGrid.repository
-                                commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trackingBranchAheadCommits : null
-                                visible:          theRepoGrid.repository != null
+                                spacing:           2
+                                RepoCommitList {
+                                    id: theTrackingAheadCommitList
+                                    Layout.fillWidth:  true
+                                    Layout.fillHeight: true
+                                    repository:       theRepoGrid.repository
+                                    commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trackingBranchAheadCommits : null
+                                    visible:          theRepoGrid.repository != null
+                                }
+                                RepoStatusDiff {
+                                    id: theTrackingAheadStatusDiff
+                                    Layout.minimumWidth: parent.width/2
+                                    Layout.fillHeight:   true
+                                    repository:          theRepoGrid.repository
+                                    commit:              theTrackingAheadCommitList.selectedCommit
+                                    status:              "committed"
+                                    visible:             theRepoGrid.repository != null
+                                }
                             }
                         }
                     }
@@ -371,12 +431,27 @@ ApplicationWindow {
                                 font.pointSize: 14
                                 visible:        theRepoGrid.repository != null
                             }
-                            RepoCommitList {
+                            RowLayout {
                                 Layout.fillWidth:  true
                                 Layout.fillHeight: true
-                                repository:       theRepoGrid.repository
-                                commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trackingBranchBehindCommits : null
-                                visible:          theRepoGrid.repository != null
+                                spacing:           2
+                                RepoCommitList {
+                                    id: theTrackingBehindCommitList
+                                    Layout.fillWidth:  true
+                                    Layout.fillHeight: true
+                                    repository:       theRepoGrid.repository
+                                    commits:          theRepoGrid.repository != null ? theRepoGrid.repository.trackingBranchBehindCommits : null
+                                    visible:          theRepoGrid.repository != null
+                                }
+                                RepoStatusDiff {
+                                    id: theTrackingBehindStatusDiff
+                                    Layout.minimumWidth: parent.width/2
+                                    Layout.fillHeight:   true
+                                    repository:          theRepoGrid.repository
+                                    commit:              theTrackingBehindCommitList.selectedCommit
+                                    status:              "committed"
+                                    visible:             theRepoGrid.repository != null
+                                }
                             }
                         }
                     }

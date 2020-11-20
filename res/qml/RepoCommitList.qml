@@ -26,6 +26,7 @@ Item {
 
     property Repo repository: null
     property var commits:     repository != null ? repository.commits : null
+    property string selectedCommit: commits != null && theList.currentIndex != -1 ? commits[theList.currentIndex] : ""
 
     ListView {
         id: theList
@@ -68,7 +69,7 @@ Item {
                 RowLayout {
                     id: theCommitRow
                     width:  root.width
-                    height: theRev.height
+                    height: theMsg.height
 
                     SelectableTextline {
                         id: theRev
@@ -89,7 +90,9 @@ Item {
                         font.pointSize:        Theme.fonts.smallPointSize
                     }
                     SelectableTextline {
+                        id: theMsg
                         Layout.fillWidth: true
+                        wrapMode:         TextInput.WordWrap
                         text:             theDelegate.details.msg ? theDelegate.details.msg : ""
                         label:            theDelegate.details.tags.map( function(t) { return "<b>"+t+"</b>";} ).join("  ")
                         font.family:      "courier"
@@ -102,7 +105,7 @@ Item {
                     RowLayout {
                         id: theChangeRow
                         width:  root.width
-                        height: theChange.height
+                        height: thePath.height
 
                         Text {
                             id: theChange
@@ -114,8 +117,10 @@ Item {
                             color:                 Theme.changeTypeToColor(text)
                         }
                         SelectableTextline {
+                            id: thePath
                             Layout.fillWidth: true
                             text:             modelData.path
+                            wrapMode:         TextInput.WrapAnywhere
                             font.family:      "courier"
                             font.pointSize:   Theme.fonts.smallPointSize
                         }

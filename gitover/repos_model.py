@@ -1801,17 +1801,23 @@ class Repo(QObject, QmlTypeMixin):
         return QVariant(cfg.statusTools(status))
 
     @pyqtSlot(str, str, int, result=str)
-    def diff(self, path, status, max_size=0):
+    def diff(self, path_or_commit, status, max_size=0):
         """Returns textual diff of given repository path using given status"""
         repo = git.Repo(self._path)
         diff = ""
-        if path:
+        if path_or_commit:
+            if status == "committed":
+                try:
+                    commit = repo.commit(path_or_commit)
+                    diff = repo.git.diff(commit, commit.parents)
+                except ValueError:
+                    diff = ""
             if status in ("modified", "conflict"):
-                diff = repo.git.diff("--", path)
+                diff = repo.git.diff("--", path_or_commit)
             elif status == "staged":
-                diff = repo.git.diff("--", path, cached=True)
+                diff = repo.git.diff("--", path_or_commit, cached=True)
             elif status == "untracked":
-                path = os.path.join(self._path, path)
+                path = os.path.join(self._path, path_or_commit)
                 if os.path.isfile(path):
                     filesize = os.stat(path).st_size
                     readsize = (max_size + 1) if max_size and max_size > filesize else -1
