@@ -1301,6 +1301,7 @@ CommitDetail = NamedTuple(
         ("msg", str),
         ("tags", list),
         ("changes", list),
+        ("diff", str)
     ),
 )
 
@@ -1806,12 +1807,6 @@ class Repo(QObject, QmlTypeMixin):
         repo = git.Repo(self._path)
         diff = ""
         if path_or_commit:
-            if status == "committed":
-                try:
-                    commit = repo.commit(path_or_commit)
-                    diff = repo.git.diff(commit, commit.parents)
-                except ValueError:
-                    diff = ""
             if status in ("modified", "conflict"):
                 diff = repo.git.diff("--", path_or_commit)
             elif status == "staged":
@@ -1830,6 +1825,8 @@ class Repo(QObject, QmlTypeMixin):
     @pyqtSlot(str, result=QVariant)
     def commit(self, rev):
         """Returns details for commit of given shahex revision"""
+        if not rev:
+            return None
         if not self._commit_cache_lock.acquire(timeout=0.1):
             LOGGER.error("Failed to get commit detail for {} in {}".format(rev, self._path))
             return None
@@ -1847,8 +1844,11 @@ class Repo(QObject, QmlTypeMixin):
                     rev, no_commit_id=True, name_status=True, r=True
                 ).split("\n")
                 changes = [CommitChange(*c.split("\t")) for c in changes if c.strip()]
+                LOGGER.debug("Get commit diff for {} in {}".format(rev, self._path))
+                diff = repo.git.diff(c, c.parents)
+                LOGGER.debug("Got commit diff for {} in {}: {}kb".format(rev, self._path, len(diff) // 1024))
                 cd = CommitDetail(
-                    rev, shortrev, str(c.committed_datetime), c.author.name, msg, tags, changes
+                    rev, shortrev, str(c.committed_datetime), c.author.name, msg, tags, changes, diff
                 )
                 self._commit_cache[rev] = cd
             while len(self._commit_cache) > self._commit_cache_max_size:
@@ -2114,6 +2114,7 @@ class CommitDetails(QObject):
     msgChanged = pyqtSignal("QString")
     tagsChanged = pyqtSignal("QStringList")
     changesChanged = pyqtSignal(QVariant)
+    diffChanged = pyqtSignal("QString")
 
     @classmethod
     def registerToQml(cls):
@@ -2129,6 +2130,7 @@ class CommitDetails(QObject):
         self._msg = ""
         self._tags = []
         self._changes = []
+        self._diff = ""
         self._runnable = None
         self.destroyed.connect(lambda: self._cancelRunnable())
 
@@ -2149,18 +2151,20 @@ class CommitDetails(QObject):
             self.user = ""
             self.msg = ""
             self.changes = []
+            self.diff = ""
         else:
             self._runnable = self._repository.workerSlot.schedule(self._updateImpl)
 
     def _updateImpl(self):
-        cd = self._repository.commit(self._rev)
-        if cd and self._runnable:
-            self.shortrev = cd.shortrev
-            self.date = cd.date
-            self.user = cd.user
-            self.msg = cd.msg
-            self.tags = cd.tags
-            self.changes = [{"change": ch.change, "path": ch.path} for ch in cd.changes]
+        commitDetail = self._repository.commit(self._rev)
+        if commitDetail and self._runnable:
+            self.shortrev = commitDetail.shortrev
+            self.date = commitDetail.date
+            self.user = commitDetail.user
+            self.msg = commitDetail.msg
+            self.tags = commitDetail.tags
+            self.changes = [{"change": ch.change, "path": ch.path} for ch in commitDetail.changes]
+            self.diff = commitDetail.diff
         self._runnable = None
 
     @pyqtProperty(Repo, notify=repositoryChanged)
@@ -2248,3 +2252,13 @@ class CommitDetails(QObject):
         if changes != self._changes:
             self._changes = changes
             self.changesChanged.emit(self._changes)
+
+    @pyqtProperty("QString", notify=diffChanged)
+    def diff(self):
+        return self._diff
+
+    @diff.setter
+    def diff(self, diff):
+        if diff != self._diff:
+            self._diff = diff
+            self.diffChanged.emit(self._diff)

@@ -47,28 +47,25 @@ Rectangle {
         }
     }
 
-    TextArea {
+    DiffText {
         id: theDiff
-        anchors.fill:     parent
-        readOnly:         true
-        wrapMode:         TextEdit.NoWrap
-        textFormat:       TextEdit.PlainText
-        font.family:      "courier"
-        selectByKeyboard: true
-        selectByMouse:    true
+        anchors.fill:  parent
 
-        onTextChanged: {
-            // scroll to top
-            flickableItem.contentX = 0
-            flickableItem.contentY = 0
+        status:        root.status
+
+        property CommitDetails details: CommitDetails {
+            repository:  root.repository
+            rev:         commit
+
+            onDiffChanged: {
+                theDiff.diff = diff
+            }
         }
 
         function updateDiff() {
-            text = (root.repository !== null ? root.repository.diff(commit || path,status,1024*512) : "")
+            if(path) {
+                theDiff.diff = (root.repository !== null ? root.repository.diff(root.path,root.status,1024*512) : "")
+            }
         }
-    }
-
-    GitDiffFormatter {
-        textDocument: (status=="committed" || status=="modified" || status=="staged" || status=="conflict") ? theDiff.textDocument : null
     }
 }
