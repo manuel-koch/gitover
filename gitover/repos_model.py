@@ -1845,7 +1845,7 @@ class Repo(QObject, QmlTypeMixin):
                 ).split("\n")
                 changes = [CommitChange(*c.split("\t")) for c in changes if c.strip()]
                 LOGGER.debug("Get commit diff for {} in {}".format(rev, self._path))
-                diff = repo.git.diff(c, c.parents)
+                diff = repo.git.diff(c.parents, c)
                 LOGGER.debug("Got commit diff for {} in {}: {}kb".format(rev, self._path, len(diff) // 1024))
                 cd = CommitDetail(
                     rev, shortrev, str(c.committed_datetime), c.author.name, msg, tags, changes, diff
