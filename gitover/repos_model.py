@@ -1401,7 +1401,7 @@ class Repo(QObject, QmlTypeMixin):
         self._pushWorker.remote_url.connect(self._onPushRemoteUrl)
 
         self._commit_cache = OrderedDict()
-        self._commit_cache_max_size = 100
+        self._commit_cache_max_size = 250
         self._commit_cache_lock = threading.Lock()
 
         self._branch = ""
