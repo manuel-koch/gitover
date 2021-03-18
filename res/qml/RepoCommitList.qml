@@ -63,6 +63,10 @@ Item {
             property CommitDetails details: CommitDetails {
                 repository: root.repository
                 rev:        modelData
+
+                Component.onCompleted: {
+                    console.info("CommitDetails for "+rev);
+                }
             }
             Column {
                 width: parent.width
