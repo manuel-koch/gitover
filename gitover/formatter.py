@@ -13,11 +13,11 @@ LOGGER = logging.getLogger(__name__)
 class GitDiffHightlighter(QSyntaxHighlighter):
     """Highlight parts of document containing git diff output"""
 
-    HEADER_DIFF_RE = re.compile("""^diff --git a/(?P<a>.+) b/(?P<b>.+)""")
-    HEADER_INDEX_RE = re.compile("""^index \S+\.\.\S+ \S+""")
+    HEADER_DIFF_RE = re.compile("""^diff (--git a/(?P<a>.+) b/(?P<b>.+))|(--cc (?P<p>.+))""")
+    HEADER_INDEX_RE = re.compile("""^index (\S+,)?\S+\.\.\S+( \S+)?""")
     HEADER_NAME_A_RE = re.compile("""^--- a/.+""")
     HEADER_NAME_B_RE = re.compile("""^\+\+\+ b/.+""")
-    HEADER_HUNK_RE = re.compile("""^@@ [-\+]?\d+,[-\+]?\d+ [-\+]?\d+,[-\+]?\d+ @@""")
+    HEADER_HUNK_RE = re.compile("""^@+ ([-\+]?\d+,[-\+]?\d+ )+@+""")
     HEADER_CHANGE_A_RE = re.compile("""^-.+""")
     HEADER_CHANGE_B_RE = re.compile("""^\+.+""")
 
@@ -39,9 +39,9 @@ class GitDiffHightlighter(QSyntaxHighlighter):
             fmt_ = fmt(m.group(0)) if callable(fmt) else fmt
             if not fmt_:
                 return
-            grp = "subject" if "subject" in m.groupdict() else 0
-            s = m.start(grp)
-            e = m.end(grp)
+            grp = "subject" if "subject" in m.groupdict() else None
+            s = m.start(grp) if grp else m.pos
+            e = m.end(grp) if grp else m.endpos
             charfmt = QTextCharFormat()
             if fmt_.get("fg", "") and QColor.isValidColor(fmt_.get("fg")):
                 charfmt.setForeground(QBrush(QColor(fmt_.get("fg"))))
