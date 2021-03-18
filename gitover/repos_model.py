@@ -108,6 +108,8 @@ class ReposModel(QAbstractItemModel, QmlTypeMixin):
         gitexe = cfg.general()["git"]
         if gitexe:
             git.Git.GIT_PYTHON_GIT_EXECUTABLE = gitexe
+            # play nice with git extensions like git-lfs, assuming their binary is located next to `git` executable
+            os.environ["PATH"] = os.pathsep.join(os.environ["PATH"].split(os.pathsep) + [os.path.dirname(gitexe)])
 
     def _loadRecentRepos(self):
         self._recentRepos = []
@@ -1824,7 +1826,7 @@ class Repo(QObject, QmlTypeMixin):
 
     @pyqtSlot(str, result=QVariant)
     def commit(self, rev):
-        """Returns details for commit of given shahex revision"""
+        """Returns details for commit of given sha-hex revision"""
         if not rev:
             return None
         if not self._commit_cache_lock.acquire(timeout=0.1):
