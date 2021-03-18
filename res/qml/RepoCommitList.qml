@@ -48,7 +48,7 @@ Item {
         }
 
         highlightFollowsCurrentItem: true
-        highlightMoveVelocity:       1000
+        highlightMoveDuration:       0
         highlightResizeDuration:     0
         highlight: Rectangle {
             color: Theme.colors.selectedRepoBg
