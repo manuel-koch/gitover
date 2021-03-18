@@ -50,7 +50,7 @@ ApplicationWindow {
                 Instantiator {
                     model: globalRepositories ? globalRepositories.recentRepos : null
                     MenuItem {
-                        text: index < globalRepositories.recentRepos.length && globalRepositories.recentRepos[index] ? globalRepositories.recentRepos[index].title + " ( " + globalRepositories.recentRepos[index].subtitle + " )" : ""
+                        text: globalRepositories && index < globalRepositories.recentRepos.length && globalRepositories.recentRepos[index] ? globalRepositories.recentRepos[index].title + " ( " + globalRepositories.recentRepos[index].subtitle + " )" : ""
                         onTriggered: globalRepositories.addRepoByPath(globalRepositories.recentRepos[index].path)
                     }
                     onObjectAdded: recentReposMenu.insertItem(index, object)
