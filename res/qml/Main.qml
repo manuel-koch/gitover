@@ -120,7 +120,7 @@ ApplicationWindow {
             horizontalAlignment:  Text.AlignHCenter
             verticalAlignment:    Text.AlignVCenter
             textFormat:           Text.RichText
-            text:                 "You are using <i>Gitover</i> " + globalVersion + ", latest released version is <a href='update'>" + globalLatestVersion + "</a>."
+            text:                 "You are using <i>GitOver</i> " + globalVersion + ", latest released version is <a href='update'>" + globalLatestVersion + "</a>."
             onLinkActivated:      { console.info(globalLatestVersionUrl); Qt.openUrlExternally(globalLatestVersionUrl) }
         }
     }
