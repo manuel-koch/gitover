@@ -56,6 +56,8 @@ Item {
         property color badgePush:     "#432182"
         property color badgeRemote:   "#8095C7"
         property color badgeBusy:     "#6DAE1E"
+
+        property color outputText: "black"
     }
 
     QtObject {

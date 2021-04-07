@@ -39,6 +39,7 @@ Rectangle {
         readOnly:         true
         wrapMode:         TextEdit.NoWrap
         font.family:      "courier"
+        textColor:        Theme.colors.outputText
         selectByKeyboard: true
         selectByMouse:    true
 
@@ -92,8 +93,8 @@ Rectangle {
         visible:          repository ? !repository.output.count : true
     }
 
-    onRepositoryChanged:   theOutput.updateAllLines()
-    Component.onCompleted: theOutput.updateAllLines()
+    onRepositoryChanged:   { theOutput.updateAllLines() }
+    Component.onCompleted: { theOutput.updateAllLines() }
 
     Connections {
         target: repository ? repository.output : null
