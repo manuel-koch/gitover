@@ -50,7 +50,7 @@ BUNDLE_DMG_NAME=${BUNDLE_NAME}_${BUNDLE_VERSION}
 SIGNING_CERT="GitOverSigning"
 
 # When using pyenv virtualenv the Python interpreter must be build with shared option enabled.
-# $ env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install 3.6.4
+# $ env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install 3.9.2
 # See https://github.com/pyinstaller/pyinstaller/wiki/Development
 #
 # Extended debug while building/running application:
