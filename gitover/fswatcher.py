@@ -226,18 +226,21 @@ class RepoTracker(QObject):
             return True  # not part of this repository
 
         if isWithinGit:
-            gitRelPath = path[len(self._git_dir) + 1 :]
+            gitRelPath = path[len(self._git_dir) + 1:]
+            gitRelPathParts = gitRelPath.split(os.sep)
             if ext in (".lock", ".cache"):
                 return True  # discard changes to git lock/cache files
             if name == "hooks":
                 return True  # discard changes to git hooks directory
+            if len(gitRelPathParts) > 1 and gitRelPathParts[-2] == "hooks":
+                return True  # discard git hooks
             if name == "modules":
                 return True  # discard changes to git modules directory
             if name in ("PREPARE_COMMIT_MSG", "COMMIT_EDITMSG", "GIT_COLA_MSG"):
                 return True  # discard changes to git commit message file
             if gitRelPath == "objects":
                 return True  # discard changes to git object files
-            if gitRelPath == "lfs/tmp":
+            if len(gitRelPathParts) >= 2 and gitRelPathParts[0] == "lfs" and gitRelPathParts[1] == "tmp":
                 return True  # discard special lfs paths
             if gitRelPath == "packed-refs":
                 return True  # discard packed refs paths
