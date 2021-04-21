@@ -1,4 +1,33 @@
 #!/usr/bin/env bash
+
+SIGN_APP_BUNDLE=true
+BUILD_DMG=true
+while [ $# -gt 0 ] ; do
+    case $1 in
+      --build-dmg)
+        BUILD_DMG=true
+        shift
+        ;;
+      --no-build-dmg)
+        BUILD_DMG=false
+        shift
+        ;;
+      --sign-app)
+        SIGN_APP_BUNDLE=true
+        shift
+        ;;
+      --no-sign-app)
+        SIGN_APP_BUNDLE=false
+        shift
+        ;;
+      *)
+        echo "Invalid argument: ${1}"
+        exit 1
+        ;;
+    esac
+done
+
+
 res/build_resources.sh
 
 # Somehow PyInstaller is unable to find PyQt5 stuff automatically.
@@ -53,30 +82,34 @@ cp ${THIS_DIR}/COPYING ${BUNDLE_MACOS_DIR}
 cp ${THIS_DIR}/LICENSE ${BUNDLE_MACOS_DIR}
 cp ${THIS_DIR}/README.md ${BUNDLE_MACOS_DIR}
 
-echo ================================================================
-echo == Code signing app bundle
-echo ================================================================
-# see https://github.com/pyinstaller/pyinstaller/wiki/Recipe-OSX-Code-Signing
-# and https://github.com/pyinstaller/pyinstaller/wiki/Recipe-OSX-Code-Signing-Qt
-${THIS_DIR}/res/fix_app_qt_folder_names_for_codesign.py ${BUNDLE_DIR}
-security find-certificate -c "${SIGNING_CERT}" >/dev/null \
-    && codesign --deep -s "${SIGNING_CERT}" ${BUNDLE_DIR} \
-    && codesign -dv --verbose=4 ${BUNDLE_DIR}
+if $SIGN_APP_BUNDLE ; then
+  echo ================================================================
+  echo == Code signing app bundle
+  echo ================================================================
+  # see https://github.com/pyinstaller/pyinstaller/wiki/Recipe-OSX-Code-Signing
+  # and https://github.com/pyinstaller/pyinstaller/wiki/Recipe-OSX-Code-Signing-Qt
+  ${THIS_DIR}/res/fix_app_qt_folder_names_for_codesign.py ${BUNDLE_DIR}
+  security find-certificate -c "${SIGNING_CERT}" >/dev/null \
+      && codesign --deep -s "${SIGNING_CERT}" ${BUNDLE_DIR} \
+      && codesign -dv --verbose=4 ${BUNDLE_DIR}
+fi
 
-echo ================================================================
-echo == Build DMG of app bundle
-echo ================================================================
-test -f ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg && rm -f ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg
-create-dmg --volname ${BUNDLE_NAME} --volicon ${BUNDLE_ICON} \
-           --icon "${BUNDLE_NAME}.app" 110 150 \
-           --app-drop-link 380 150 \
-           --background res/dmg_bg.png \
-           ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg \
-           ${BUNDLE_DIR}
+if $BUILD_DMG ; then
+  echo ================================================================
+  echo == Build DMG of app bundle
+  echo ================================================================
+  test -f ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg && rm -f ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg
+  create-dmg --volname ${BUNDLE_NAME} --volicon ${BUNDLE_ICON} \
+             --icon "${BUNDLE_NAME}.app" 110 150 \
+             --app-drop-link 380 150 \
+             --background res/dmg_bg.png \
+             ${DIST_DIR}/${BUNDLE_DMG_NAME}.dmg \
+             ${BUNDLE_DIR}
 
-echo ================================================================
-echo == Build checksum of DMG
-echo ================================================================
-pushd ${DIST_DIR} >/dev/null
-shasum -a 256 ${BUNDLE_DMG_NAME}.dmg > ${BUNDLE_DMG_NAME}.sha256
-popd >/dev/null
+  echo ================================================================
+  echo == Build checksum of DMG
+  echo ================================================================
+  pushd ${DIST_DIR} >/dev/null
+  shasum -a 256 ${BUNDLE_DMG_NAME}.dmg > ${BUNDLE_DMG_NAME}.sha256
+  popd >/dev/null
+fi
