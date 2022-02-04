@@ -47,7 +47,7 @@ BUNDLE_MACOS_DIR=${BUNDLE_CONTENTS_DIR}/MacOS
 BUNDLE_ICON=${THIS_DIR}/res/icon.icns
 BUNDLE_VERSION=$(grep "gitover_version =" ${THIS_DIR}/gitover/ui/resources.py | cut -d "=" -f 2 | tr -d " '")
 BUNDLE_DMG_NAME=${BUNDLE_NAME}_${BUNDLE_VERSION}
-SIGNING_CERT="GitOverSigning"
+SIGNING_CERT="GitOverSigning2"
 
 # When using pyenv virtualenv the Python interpreter must be build with shared option enabled.
 # $ env PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv install 3.9.2
@@ -84,14 +84,17 @@ cp ${THIS_DIR}/README.md ${BUNDLE_MACOS_DIR}
 
 if $SIGN_APP_BUNDLE ; then
   echo ================================================================
-  echo == Code signing app bundle
+  echo == Code signing app bundle using certificate ${SIGNING_CERT}
   echo ================================================================
   # see https://github.com/pyinstaller/pyinstaller/wiki/Recipe-OSX-Code-Signing
   # and https://github.com/pyinstaller/pyinstaller/wiki/Recipe-OSX-Code-Signing-Qt
   ${THIS_DIR}/res/fix_app_qt_folder_names_for_codesign.py ${BUNDLE_DIR}
-  security find-certificate -c "${SIGNING_CERT}" >/dev/null \
-      && codesign --deep -s "${SIGNING_CERT}" ${BUNDLE_DIR} \
-      && codesign -dv --verbose=4 ${BUNDLE_DIR}
+  echo == Checking code signing cert...
+  security find-certificate -c "${SIGNING_CERT}" -p | openssl x509 -noout -text  -inform pem | grep -E "Validity|(Not (Before|After)\s*:)"
+  echo == Signing code...
+  codesign --verbose=4 --force --deep --sign "${SIGNING_CERT}" ${BUNDLE_DIR}
+  echo == Signed app bundle...
+  codesign --verbose=4 --display ${BUNDLE_DIR}
 fi
 
 if $BUILD_DMG ; then
