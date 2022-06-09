@@ -66,6 +66,7 @@ Rectangle {
             width:            theListView.width
             height:           theListView.count <= 1 ? Math.max(theListView.height,implicitHeight) : implicitHeight
             text:             model.modelData
+            activeFocusOnTab: false
             readOnly:         true
             wrapMode:         TextEdit.WrapAnywhere
             textFormat:       TextEdit.PlainText
