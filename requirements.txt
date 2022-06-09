@@ -8,29 +8,29 @@ altgraph==0.17.2
     # via
     #   macholib
     #   pyinstaller
-certifi==2021.10.8
+certifi==2022.5.18.1
     # via requests
-charset-normalizer==2.0.11
+charset-normalizer==2.0.12
     # via requests
 gitdb==4.0.9
     # via gitpython
-gitpython==3.1.26
+gitpython==3.1.27
     # via -r requirements.in
 idna==3.3
     # via requests
-macholib==1.15.2
+macholib==1.16
     # via pyinstaller
 pathtools==0.1.2
     # via watchdog
-pyinstaller==4.9
+pyinstaller==4.10
     # via -r requirements.in
-pyinstaller-hooks-contrib==2022.0
+pyinstaller-hooks-contrib==2022.7
     # via pyinstaller
 pyqt5==5.15.6
     # via -r requirements.in
 pyqt5-qt5==5.15.2
     # via pyqt5
-pyqt5-sip==12.9.1
+pyqt5-sip==12.10.1
     # via pyqt5
 pyyaml==6.0
     # via -r requirements.in
@@ -38,7 +38,7 @@ requests==2.27.1
     # via -r requirements.in
 smmap==5.0.0
     # via gitdb
-urllib3==1.26.8
+urllib3==1.26.9
     # via requests
 watchdog==0.10.4
     # via -r requirements.in
