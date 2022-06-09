@@ -240,7 +240,7 @@ class RepoTracker(QObject):
                 return True  # discard changes to git commit message file
             if gitRelPath == "objects":
                 return True  # discard changes to git object files
-            if len(gitRelPathParts) >= 2 and gitRelPathParts[0] == "lfs" and gitRelPathParts[1] == "tmp":
+            if len(gitRelPathParts) >= 3 and "lfs" in gitRelPathParts and "tmp" in gitRelPathParts:
                 return True  # discard special lfs paths
             if gitRelPath == "packed-refs":
                 return True  # discard packed refs paths
