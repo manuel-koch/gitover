@@ -1,5 +1,5 @@
 GitPython~=3.1.0
-PyInstaller~=4.9
+PyInstaller~=5.13
 PyQt5~=5.15.0
 PyYAML~=6.0
 requests~=2.27.1

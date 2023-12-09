@@ -5,9 +5,7 @@
 #    'make compile_deps' or 'make upgrade_deps'
 #
 altgraph==0.17.2
-    # via
-    #   macholib
-    #   pyinstaller
+    # via pyinstaller
 certifi==2022.5.18.1
     # via requests
 charset-normalizer==2.0.12
@@ -18,11 +16,9 @@ gitpython==3.1.27
     # via -r requirements.in
 idna==3.3
     # via requests
-macholib==1.16
-    # via pyinstaller
 pathtools==0.1.2
     # via watchdog
-pyinstaller==4.10
+pyinstaller==5.13.1
     # via -r requirements.in
 pyinstaller-hooks-contrib==2022.7
     # via pyinstaller
